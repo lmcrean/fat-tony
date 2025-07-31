@@ -25,12 +25,14 @@ class PortfolioExporter:
         """Fetch all necessary data from the API."""
         print("Fetching portfolio data...")
         
-        # Get account metadata for currency
+        # Get account metadata for currency (optional - may fail due to API permissions)
         try:
             metadata = self.client.get_account_metadata()
             account_currency = metadata.get('currencyCode', 'GBP')
-        except:
-            account_currency = 'GBP'
+            print(f"Account currency: {account_currency}")
+        except Exception as e:
+            print(f"Could not fetch account metadata (API permissions): {e}")
+            account_currency = 'GBP'  # Default currency when account access is restricted
         
         # Get portfolio positions
         portfolio_data = self.client.get_portfolio()
@@ -66,9 +68,14 @@ class PortfolioExporter:
                 )
                 self.positions.append(position)
         
-        # Get cash balance
+        # Get cash balance (optional - may fail due to API permissions)
         print("Fetching cash balance...")
-        cash_data = self.client.get_account_cash()
+        try:
+            cash_data = self.client.get_account_cash()
+            free_funds = Decimal(str(cash_data.get('free', 0)))
+        except Exception as e:
+            print(f"Could not fetch cash balance (API permissions): {e}")
+            free_funds = Decimal('0')  # Default when account access is restricted
         
         # Calculate summary
         total_invested = sum(p.cost_basis for p in self.positions)
@@ -76,7 +83,7 @@ class PortfolioExporter:
         total_result = total_value - total_invested
         
         self.account_summary = AccountSummary(
-            free_funds=Decimal(str(cash_data.get('free', 0))),
+            free_funds=free_funds,
             invested=total_value,
             result=total_result,
             currency=account_currency

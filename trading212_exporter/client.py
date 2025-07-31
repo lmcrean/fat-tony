@@ -69,8 +69,8 @@ class Trading212Client:
     
     def get_account_cash(self) -> Dict:
         """Get account cash balance."""
-        return self._make_request("/account/cash")
+        return self._make_request("/equity/account/cash")
     
     def get_account_metadata(self) -> Dict:
         """Get account metadata including currency."""
-        return self._make_request("/account/metadata")
+        return self._make_request("/equity/account/info")
