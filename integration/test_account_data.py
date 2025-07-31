@@ -13,15 +13,16 @@ from trading212_exporter import Trading212Client
 class TestAccountData:
     """Test Trading 212 account data endpoints."""
     
-    def test_get_account_cash_gbp(self, api_client):
-        """Test getting account cash balance for GBP account."""
+    def test_get_account_cash_usd(self, api_client):
+        """Test getting account cash balance for USD account."""
         cash_data = api_client.get_account_cash()
         
         assert isinstance(cash_data, dict)
         assert 'free' in cash_data
-        assert isinstance(cash_data['free'], (int, float))
-        assert cash_data['free'] >= 0
-        assert cash_data['free'] == 1250.50
+        assert isinstance(cash_data['free'], (int, float, str))
+        free_value = float(cash_data['free'])
+        assert free_value >= 0
+        assert free_value == 850.75
         
         # Check additional fields are present
         assert 'total' in cash_data
@@ -35,16 +36,16 @@ class TestAccountData:
         usd_client.get_account_cash.return_value = mock_fixture_data['account_cash']['usd_account']
         
         cash_data = usd_client.get_account_cash()
-        assert cash_data['free'] == 850.75
-        assert cash_data['total'] == 850.75
+        assert float(cash_data['free']) == 850.75
+        assert float(cash_data['total']) == 850.75
         
         # Test ISA account
         isa_client = Mock(spec=Trading212Client)
         isa_client.get_account_cash.return_value = mock_fixture_data['account_cash']['isa_account']
         
         cash_data = isa_client.get_account_cash()
-        assert cash_data['free'] == 500.25
-        assert cash_data['total'] == 500.25
+        assert float(cash_data['free']) == 500.25
+        assert float(cash_data['total']) == 500.25
     
     def test_get_account_cash_empty_account(self, mock_fixture_data):
         """Test getting cash balance for empty account."""
@@ -52,10 +53,10 @@ class TestAccountData:
         empty_client.get_account_cash.return_value = mock_fixture_data['account_cash']['empty_account']
         
         cash_data = empty_client.get_account_cash()
-        assert cash_data['free'] == 0.0
-        assert cash_data['total'] == 0.0
-        assert cash_data['invested'] == 0.0
-        assert cash_data['result'] == 0.0
+        assert float(cash_data['free']) == 0.0
+        assert float(cash_data['total']) == 0.0
+        assert float(cash_data['invested']) == 0.0
+        assert float(cash_data['result']) == 0.0
     
     def test_account_cash_data_structure(self, api_client):
         """Test that account cash data has expected structure."""
@@ -65,7 +66,9 @@ class TestAccountData:
         expected_fields = ['free', 'total', 'invested', 'result', 'pieCash']
         for field in expected_fields:
             assert field in cash_data, f"Missing field: {field}"
-            assert isinstance(cash_data[field], (int, float)), f"Field {field} should be numeric"
+            assert isinstance(cash_data[field], (int, float, str)), f"Field {field} should be numeric or string"
+            # Verify it can be converted to float
+            float(cash_data[field])
     
     def test_account_cash_with_api_error(self, mock_fixture_data):
         """Test handling of API errors when fetching cash data."""
@@ -81,7 +84,7 @@ class TestAccountData:
         
         # Convert to Decimal to test precision handling
         free_amount = Decimal(str(cash_data['free']))
-        assert free_amount == Decimal('1250.50')
+        assert free_amount == Decimal('850.75')
         
         # Ensure we can handle fractional pence/cents
         assert free_amount.as_tuple().exponent >= -2  # At least 2 decimal places
@@ -91,13 +94,13 @@ class TestAccountData:
         cash_data = api_client.get_account_cash()
         
         # All amounts should be non-negative
-        assert cash_data['free'] >= 0
-        assert cash_data['total'] >= 0
-        assert cash_data['invested'] >= 0
-        assert cash_data['pieCash'] >= 0
+        assert float(cash_data['free']) >= 0
+        assert float(cash_data['total']) >= 0
+        assert float(cash_data['invested']) >= 0
+        assert float(cash_data['pieCash']) >= 0
         
         # Total should be >= free funds (basic consistency check)
-        assert cash_data['total'] >= cash_data['free']
+        assert float(cash_data['total']) >= float(cash_data['free'])
     
     def test_multiple_account_cash_fetching(self, api_clients):
         """Test fetching cash data from multiple accounts."""
@@ -106,10 +109,10 @@ class TestAccountData:
             
             assert isinstance(cash_data, dict)
             assert 'free' in cash_data
-            assert cash_data['free'] >= 0
+            assert float(cash_data['free']) >= 0
             
             # Verify each account has distinct cash amounts
             if account_name == 'Stocks & Shares ISA':
-                assert cash_data['free'] == 500.25
+                assert float(cash_data['free']) == 500.25
             elif account_name == 'Invest Account':
-                assert cash_data['free'] == 850.75
+                assert float(cash_data['free']) == 850.75

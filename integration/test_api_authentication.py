@@ -21,15 +21,15 @@ class TestAPIAuthentication:
         assert 'currencyCode' in metadata
         assert metadata['currencyCode'] in ['GBP', 'EUR', 'USD']
     
-    def test_get_account_metadata_gbp(self, api_client):
-        """Test getting account metadata for GBP account."""
+    def test_get_account_metadata_usd(self, api_client):
+        """Test getting account metadata for USD account."""
         metadata = api_client.get_account_metadata()
         
         assert isinstance(metadata, dict)
         assert 'currencyCode' in metadata
         assert 'id' in metadata
-        assert metadata['currencyCode'] == 'GBP'
-        assert metadata['id'] == 12345
+        assert metadata['currencyCode'] == 'USD'
+        assert metadata['id'] == 67890
     
     def test_get_account_metadata_different_currencies(self, mock_fixture_data):
         """Test account metadata with different currency codes."""

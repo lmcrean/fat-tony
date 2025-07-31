@@ -38,9 +38,9 @@ def mock_api_client(mock_fixture_data):
     client.account_name = 'Trading 212'
     client._request_interval = 5  # For rate limiting tests
     
-    # Mock successful API responses
-    client.get_account_metadata.return_value = mock_fixture_data['account_metadata']['success']
-    client.get_account_cash.return_value = mock_fixture_data['account_cash']['gbp_account']
+    # Mock successful API responses - use USD account to match USD positions
+    client.get_account_metadata.return_value = mock_fixture_data['account_metadata']['usd_account']
+    client.get_account_cash.return_value = mock_fixture_data['account_cash']['usd_account']
     client.get_portfolio.return_value = mock_fixture_data['portfolio_positions']['multiple_positions']
     
     # Mock position details with dynamic responses

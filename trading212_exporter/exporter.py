@@ -97,8 +97,8 @@ class PortfolioExporter:
             
             self.account_summaries[account_name] = AccountSummary(
                 free_funds=free_funds,
-                invested=total_value,
-                result=total_result,
+                invested=Decimal(str(total_value)),
+                result=Decimal(str(total_result)),
                 currency=account_currency,
                 account_name=account_name
             )
