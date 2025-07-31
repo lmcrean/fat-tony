@@ -14,9 +14,10 @@ class Trading212Client:
     
     BASE_URL = "https://live.trading212.com/api/v0"
     
-    def __init__(self, api_key: str):
-        """Initialize the client with API key."""
+    def __init__(self, api_key: str, account_name: str = "Trading 212"):
+        """Initialize the client with API key and account name."""
         self.api_key = api_key
+        self.account_name = account_name
         self.session = requests.Session()
         self.session.headers.update({
             "Authorization": api_key,

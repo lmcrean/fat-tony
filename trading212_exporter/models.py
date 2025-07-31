@@ -15,6 +15,7 @@ class Position:
     average_price: Decimal
     current_price: Decimal
     currency: str
+    account_name: str = "Trading 212"
     
     @property
     def market_value(self) -> Decimal:
@@ -46,3 +47,4 @@ class AccountSummary:
     invested: Decimal
     result: Decimal
     currency: str = "GBP"
+    account_name: str = "Trading 212"
