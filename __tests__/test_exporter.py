@@ -54,15 +54,17 @@ class TestPortfolioExporter:
             free_funds=Decimal("1000.00"),
             invested=Decimal("11100.00"),  # 1600 + 9500
             result=Decimal("-400.00"),     # 100 + (-500)
-            currency="USD"
+            currency="USD",
+            account_name="Trading 212"
         )
     
     def test_exporter_initialization(self, mock_client):
         """Test exporter initialization."""
         exporter = PortfolioExporter(mock_client)
-        assert exporter.client == mock_client
+        assert "Trading 212" in exporter.clients
+        assert exporter.clients["Trading 212"] == mock_client
         assert exporter.positions == []
-        assert exporter.account_summary is None
+        assert exporter.account_summaries == {}
     
     def test_fetch_data_success(self, exporter, mock_client):
         """Test successful data fetching."""
@@ -93,8 +95,10 @@ class TestPortfolioExporter:
         assert position.shares == Decimal("10.0")
         
         # Verify account summary was created
-        assert exporter.account_summary is not None
-        assert exporter.account_summary.free_funds == Decimal("1000.0")
+        assert len(exporter.account_summaries) == 1
+        assert "Trading 212" in exporter.account_summaries
+        account_summary = exporter.account_summaries["Trading 212"]
+        assert account_summary.free_funds == Decimal("1000.0")
     
     def test_fetch_data_with_api_error(self, exporter, mock_client):
         """Test data fetching with API error for position details."""
@@ -139,10 +143,12 @@ class TestPortfolioExporter:
     
     def test_generate_markdown_empty_portfolio(self, exporter):
         """Test markdown generation with empty portfolio."""
-        exporter.account_summary = AccountSummary(
+        exporter.account_summaries["Trading 212"] = AccountSummary(
             free_funds=Decimal("1000.00"),
             invested=Decimal("0.00"),
-            result=Decimal("0.00")
+            result=Decimal("0.00"),
+            currency="GBP",
+            account_name="Trading 212"
         )
         
         markdown = exporter.generate_markdown()
@@ -156,7 +162,7 @@ class TestPortfolioExporter:
     def test_generate_markdown_with_positions(self, exporter, sample_positions, sample_account_summary):
         """Test markdown generation with positions."""
         exporter.positions = sample_positions
-        exporter.account_summary = sample_account_summary
+        exporter.account_summaries["Trading 212"] = sample_account_summary
         
         markdown = exporter.generate_markdown()
         
@@ -179,7 +185,7 @@ class TestPortfolioExporter:
     def test_save_to_file(self, exporter, sample_positions, sample_account_summary):
         """Test saving markdown to file."""
         exporter.positions = sample_positions
-        exporter.account_summary = sample_account_summary
+        exporter.account_summaries["Trading 212"] = sample_account_summary
         
         with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as tmp_file:
             temp_filename = tmp_file.name
@@ -207,10 +213,12 @@ class TestPortfolioExporter:
     def test_save_to_file_default_name(self, mock_print, mock_file, exporter):
         """Test saving to default filename."""
         exporter.positions = []
-        exporter.account_summary = AccountSummary(
+        exporter.account_summaries["Trading 212"] = AccountSummary(
             free_funds=Decimal("100.00"),
             invested=Decimal("0.00"),
-            result=Decimal("0.00")
+            result=Decimal("0.00"),
+            currency="GBP",
+            account_name="Trading 212"
         )
         
         exporter.save_to_file()
@@ -218,3 +226,108 @@ class TestPortfolioExporter:
         # Verify default filename was used
         mock_file.assert_called_once_with("portfolio.md", 'w', encoding='utf-8')
         mock_print.assert_called_once_with("\nPortfolio exported successfully to portfolio.md")
+    
+    def test_generate_markdown_multi_account(self, mock_client):
+        """Test markdown generation with multiple accounts."""
+        # Create exporter with multiple clients
+        mock_client2 = Mock(spec=Trading212Client)
+        exporter = PortfolioExporter({
+            "Trading 212": mock_client,
+            "Trading 212 ISA": mock_client2
+        })
+        
+        # Add positions for different accounts
+        exporter.positions = [
+            Position(
+                ticker="AAPL",
+                name="Apple Inc.",
+                shares=Decimal("10"),
+                average_price=Decimal("150.00"),
+                current_price=Decimal("160.00"),
+                currency="USD",
+                account_name="Trading 212"
+            ),
+            Position(
+                ticker="GOOGL",
+                name="Alphabet Inc.",
+                shares=Decimal("5"),
+                average_price=Decimal("2000.00"),
+                current_price=Decimal("1900.00"),
+                currency="USD",
+                account_name="Trading 212 ISA"
+            )
+        ]
+        
+        # Add account summaries for both accounts
+        exporter.account_summaries["Trading 212"] = AccountSummary(
+            free_funds=Decimal("500.00"),
+            invested=Decimal("1600.00"),
+            result=Decimal("100.00"),
+            currency="USD",
+            account_name="Trading 212"
+        )
+        exporter.account_summaries["Trading 212 ISA"] = AccountSummary(
+            free_funds=Decimal("300.00"),
+            invested=Decimal("9500.00"),
+            result=Decimal("-500.00"),
+            currency="USD",
+            account_name="Trading 212 ISA"
+        )
+        
+        markdown = exporter.generate_markdown()
+        
+        # Check multi-account structure
+        assert "## Trading 212" in markdown
+        assert "## Trading 212 ISA" in markdown
+        assert "## Combined Totals" in markdown
+        assert "### Positions" in markdown
+        assert "### Summary" in markdown
+        
+        # Check individual account data
+        assert "Apple Inc." in markdown
+        assert "Alphabet Inc." in markdown
+        
+        # Check combined totals
+        assert "TOTAL FREE FUNDS" in markdown
+        assert "TOTAL PORTFOLIO" in markdown
+        assert "TOTAL RESULT" in markdown
+        
+    def test_exporter_initialization_with_dict(self, mock_client):
+        """Test exporter initialization with dictionary of clients."""
+        mock_client2 = Mock(spec=Trading212Client)
+        clients = {
+            "Trading 212": mock_client,
+            "Trading 212 ISA": mock_client2
+        }
+        exporter = PortfolioExporter(clients)
+        
+        assert len(exporter.clients) == 2
+        assert exporter.clients["Trading 212"] == mock_client
+        assert exporter.clients["Trading 212 ISA"] == mock_client2
+        
+    def test_fetch_data_with_metadata_error(self, exporter, mock_client):
+        """Test fetch_data when get_account_metadata fails."""
+        # Mock metadata to raise exception
+        mock_client.get_account_metadata.side_effect = Exception("API permission denied")
+        mock_client.get_portfolio.return_value = []
+        mock_client.get_account_cash.return_value = {"free": 100.0}
+        
+        # Should not raise exception, should use default currency
+        exporter.fetch_data()
+        
+        # Verify it continued with default currency
+        assert "Trading 212" in exporter.account_summaries
+        
+    def test_fetch_data_with_cash_error(self, exporter, mock_client):
+        """Test fetch_data when get_account_cash fails."""
+        mock_client.get_account_metadata.return_value = {"currencyCode": "USD"}
+        mock_client.get_portfolio.return_value = []
+        mock_client.get_account_cash.side_effect = Exception("API permission denied")
+        
+        # Should not raise exception, should use default free funds (0)
+        exporter.fetch_data()
+        
+        # Verify it continued with zero free funds
+        assert "Trading 212" in exporter.account_summaries
+        account_summary = exporter.account_summaries["Trading 212"]
+        assert account_summary.free_funds == Decimal("0")

@@ -18,8 +18,12 @@ class TestPortfolioExport:
         portfolio_exporter.fetch_data()
         
         # Verify data was fetched
-        assert portfolio_exporter.account_summary is not None
-        assert isinstance(portfolio_exporter.account_summary.free_funds, Decimal)
+        assert portfolio_exporter.account_summaries is not None
+        assert len(portfolio_exporter.account_summaries) > 0
+        
+        # Check first account summary
+        first_account_summary = list(portfolio_exporter.account_summaries.values())[0]
+        assert isinstance(first_account_summary.free_funds, Decimal)
         assert isinstance(portfolio_exporter.positions, list)
     
     def test_generate_markdown_integration(self, portfolio_exporter):

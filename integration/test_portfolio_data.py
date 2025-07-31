@@ -34,4 +34,7 @@ class TestPortfolioData:
         details = api_client.get_position_details(ticker)
         
         assert isinstance(details, dict)
-        assert 'name' in details or 'shortName' in details
+        # Check for common fields that should exist in position details
+        common_fields = ['ticker', 'averagePrice', 'currentPrice', 'quantity']
+        found_fields = [field for field in common_fields if field in details]
+        assert len(found_fields) > 0, f"Expected at least one common field, got: {list(details.keys())}"

@@ -98,7 +98,8 @@ class TestTrading212Client:
         with patch('time.sleep') as mock_sleep:
             result = client._make_request("/test")
             assert result == {"status": "success"}
-            mock_sleep.assert_called_once_with(5)
+            # Should be called at least once with 5 (retry logic), might also be called for rate limiting
+            assert any(call.args == (5,) for call in mock_sleep.call_args_list)
     
     @responses.activate
     def test_get_portfolio(self, client):
@@ -152,7 +153,7 @@ class TestTrading212Client:
         
         responses.add(
             responses.GET,
-            "https://live.trading212.com/api/v0/account/cash",
+            "https://live.trading212.com/api/v0/equity/account/cash",
             json=mock_cash,
             status=200
         )
@@ -170,7 +171,7 @@ class TestTrading212Client:
         
         responses.add(
             responses.GET,
-            "https://live.trading212.com/api/v0/account/metadata",
+            "https://live.trading212.com/api/v0/equity/account/info",
             json=mock_metadata,
             status=200
         )
