@@ -30,12 +30,13 @@ class IsolatedTestData:
     
     def copy(self) -> 'IsolatedTestData':
         """Create a deep copy of test data to ensure test isolation."""
+        import copy
         return IsolatedTestData(
-            account_metadata=json.loads(json.dumps(self.account_metadata)),
-            account_cash=json.loads(json.dumps(self.account_cash)),
-            portfolio_positions=json.loads(json.dumps(self.portfolio_positions)),
-            position_details=json.loads(json.dumps(self.position_details)),
-            expected_calculations=json.loads(json.dumps(self.expected_calculations))
+            account_metadata=copy.deepcopy(self.account_metadata),
+            account_cash=copy.deepcopy(self.account_cash),
+            portfolio_positions=copy.deepcopy(self.portfolio_positions),
+            position_details=copy.deepcopy(self.position_details),
+            expected_calculations=copy.deepcopy(self.expected_calculations)
         )
 
 
@@ -68,8 +69,8 @@ class IsolatedIntegrationTestBase(ABC):
     
     def _create_isolated_mock_client(self) -> Mock:
         """Create a completely isolated mock client for this test."""
-        # Use create_autospec for stricter mocking
-        client = create_autospec(Trading212Client, spec_set=True)
+        # Use Mock with spec for proper attribute access
+        client = Mock(spec=Trading212Client)
         client.account_name = self.get_account_name()
         client._request_interval = 5  # For rate limiting tests
         

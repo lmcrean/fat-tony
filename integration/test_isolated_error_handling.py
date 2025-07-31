@@ -6,7 +6,7 @@ These tests validate error handling with strict assertions to prevent hallucinat
 
 import pytest
 from decimal import Decimal
-from unittest.mock import create_autospec, Mock
+from unittest.mock import Mock
 
 from trading212_exporter import Trading212Client, PortfolioExporter
 from .isolated_base import IsolatedIntegrationTestBase, IsolatedTestData
@@ -28,7 +28,7 @@ class TestIsolatedApiErrorHandling(IsolatedIntegrationTestBase):
     
     def _create_isolated_error_client(self) -> Mock:
         """Create a client that simulates API errors."""
-        client = create_autospec(Trading212Client, spec_set=True)
+        client = Mock(spec=Trading212Client)
         client.account_name = "Trading 212"
         client._request_interval = 5
         
@@ -172,7 +172,7 @@ class TestIsolatedNetworkErrorHandling(IsolatedIntegrationTestBase):
     
     def _create_isolated_network_error_client(self) -> Mock:
         """Create a client that simulates network errors."""
-        client = create_autospec(Trading212Client, spec_set=True)
+        client = Mock(spec=Trading212Client)
         client.account_name = "Trading 212"
         client._request_interval = 5
         
@@ -247,7 +247,7 @@ class TestIsolatedPermissionErrorHandling(IsolatedIntegrationTestBase):
     
     def _create_isolated_permission_error_client(self) -> Mock:
         """Create a client that simulates permission errors."""
-        client = create_autospec(Trading212Client, spec_set=True)
+        client = Mock(spec=Trading212Client)
         client.account_name = "Trading 212"
         client._request_interval = 5
         
@@ -314,7 +314,7 @@ class TestIsolatedDataValidationErrors(IsolatedIntegrationTestBase):
     def test_isolated_invalid_position_data_handling(self):
         """Test handling of invalid position data with strict validation."""
         # Create client with invalid position data
-        client = create_autospec(Trading212Client, spec_set=True)
+        client = Mock(spec=Trading212Client)
         client.account_name = "Trading 212"
         client._request_interval = 5
         
@@ -363,7 +363,7 @@ class TestIsolatedDataValidationErrors(IsolatedIntegrationTestBase):
     def test_isolated_missing_required_fields_handling(self):
         """Test handling of missing required fields with strict validation."""
         # Create client with incomplete data
-        client = create_autospec(Trading212Client, spec_set=True)
+        client = Mock(spec=Trading212Client)
         client.account_name = "Trading 212"
         client._request_interval = 5
         

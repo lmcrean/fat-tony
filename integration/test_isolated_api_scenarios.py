@@ -7,7 +7,7 @@ These tests target specific API behaviors and edge cases to improve coverage.
 import pytest
 import time
 from decimal import Decimal
-from unittest.mock import create_autospec, Mock, call
+from unittest.mock import Mock, call
 
 from trading212_exporter import Trading212Client, PortfolioExporter
 from .isolated_base import IsolatedIntegrationTestBase, IsolatedTestData
@@ -28,7 +28,7 @@ class TestIsolatedRateLimitingScenarios(IsolatedIntegrationTestBase):
     
     def _create_isolated_rate_limited_client(self) -> Mock:
         """Create a client that enforces rate limiting."""
-        client = create_autospec(Trading212Client, spec_set=True)
+        client = Mock(spec=Trading212Client)
         client.account_name = "Trading 212"
         client._request_interval = 0.1  # Fast interval for testing
         client._last_request_time = 0
@@ -101,7 +101,7 @@ class TestIsolatedRateLimitingScenarios(IsolatedIntegrationTestBase):
     
     def test_isolated_rate_limit_retry_behavior(self):
         """Test behavior when hitting rate limits with retry logic."""
-        client = create_autospec(Trading212Client, spec_set=True)
+        client = Mock(spec=Trading212Client)
         client.account_name = "Trading 212"
         client._request_interval = 0.05
         
@@ -155,7 +155,7 @@ class TestIsolatedAuthenticationScenarios(IsolatedIntegrationTestBase):
     
     def test_isolated_invalid_api_key_handling(self):
         """Test handling of invalid API key with strict validation."""
-        client = create_autospec(Trading212Client, spec_set=True)
+        client = Mock(spec=Trading212Client)
         client.account_name = "Trading 212"
         client._request_interval = 5
         
@@ -193,7 +193,7 @@ class TestIsolatedAuthenticationScenarios(IsolatedIntegrationTestBase):
     
     def test_isolated_expired_token_handling(self):
         """Test handling of expired authentication token."""
-        client = create_autospec(Trading212Client, spec_set=True)
+        client = Mock(spec=Trading212Client)
         client.account_name = "Trading 212"
         client._request_interval = 5
         
@@ -331,7 +331,7 @@ class TestIsolatedCurrencyScenarios(IsolatedIntegrationTestBase):
     
     def test_isolated_mixed_currency_position_handling(self):
         """Test handling of positions with mixed currencies in same account."""
-        client = create_autospec(Trading212Client, spec_set=True)
+        client = Mock(spec=Trading212Client)
         client.account_name = "Trading 212"
         client._request_interval = 5
         

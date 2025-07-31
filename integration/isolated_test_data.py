@@ -73,9 +73,9 @@ class SingleAccountTestData:
             },
             expected_calculations={
                 "total_positions": 3,
-                "total_market_value": Decimal("27100.0"),  # 1600 + 9500 + 5500
-                "total_cost_basis": Decimal("26500.0"),    # 1500 + 10000 + 5000
-                "total_profit_loss": Decimal("600.0"),     # 100 + (-500) + 500
+                "total_market_value": Decimal("16600.0"),  # 1600 + 9500 + 5500
+                "total_cost_basis": Decimal("16500.0"),    # 1500 + 10000 + 5000
+                "total_profit_loss": Decimal("100.0"),     # 100 + (-500) + 500
                 "account_currency": "USD",
                 "free_funds": Decimal("850.75")
             }
