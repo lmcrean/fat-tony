@@ -1,0 +1,22 @@
+{
+  "success": {
+    "currencyCode": "GBP",
+    "id": 12345,
+    "type": "LIVE"
+  },
+  "usd_account": {
+    "currencyCode": "USD", 
+    "id": 67890,
+    "type": "LIVE"
+  },
+  "eur_account": {
+    "currencyCode": "EUR",
+    "id": 11111,
+    "type": "LIVE"  
+  },
+  "isa_account": {
+    "currencyCode": "GBP",
+    "id": 22222,
+    "type": "ISA"
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "AAPL": {
+    "name": "Apple Inc.",
+    "ticker": "AAPL",
+    "isin": "US0378331005",
+    "type": "STOCK"
+  },
+  "GOOGL": {
+    "name": "Alphabet Inc.",
+    "ticker": "GOOGL", 
+    "isin": "US02079K3059",
+    "type": "STOCK"
+  },
+  "TSLA": {
+    "name": "Tesla Inc.",
+    "ticker": "TSLA",
+    "isin": "US88160R1014",
+    "type": "STOCK"
+  },
+  "VOD.L": {
+    "name": "Vodafone Group Plc",
+    "ticker": "VOD.L",
+    "isin": "GB00BH4HKS39", 
+    "type": "STOCK"
+  },
+  "LLOY.L": {
+    "name": "Lloyds Banking Group Plc",
+    "ticker": "LLOY.L",
+    "isin": "GB0008706128",
+    "type": "STOCK"
+  },
+  "AMZN": {
+    "name": "Amazon.com Inc.",
+    "ticker": "AMZN",
+    "isin": "US0231351067",
+    "type": "STOCK"
+  },
+  "INVALID": {
+    "error": "Position not found"
+  },
+  "minimal_response": {
+    "ticker": "TEST"
+  }
+}

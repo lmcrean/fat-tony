@@ -1,0 +1,30 @@
+{
+  "gbp_account": {
+    "free": 1250.50,
+    "total": 1250.50,
+    "invested": 0.0,
+    "result": 0.0,
+    "pieCash": 0.0
+  },
+  "usd_account": {
+    "free": 850.75,
+    "total": 850.75,
+    "invested": 0.0,
+    "result": 0.0,
+    "pieCash": 0.0
+  },
+  "isa_account": {
+    "free": 500.25,
+    "total": 500.25,
+    "invested": 0.0,
+    "result": 0.0,
+    "pieCash": 0.0
+  },
+  "empty_account": {
+    "free": 0.0,
+    "total": 0.0,
+    "invested": 0.0,
+    "result": 0.0,
+    "pieCash": 0.0
+  }
+}

@@ -1,0 +1,60 @@
+{
+  "single_position": [
+    {
+      "ticker": "AAPL",
+      "quantity": 10.0,
+      "averagePrice": 150.0,
+      "currentPrice": 160.0,
+      "currencyCode": "USD"
+    }
+  ],
+  "multiple_positions": [
+    {
+      "ticker": "AAPL",
+      "quantity": 10.0,
+      "averagePrice": 150.0,
+      "currentPrice": 160.0,
+      "currencyCode": "USD"
+    },
+    {
+      "ticker": "GOOGL",
+      "quantity": 5.0,
+      "averagePrice": 2000.0,
+      "currentPrice": 1900.0,
+      "currencyCode": "USD"
+    },
+    {
+      "ticker": "TSLA",
+      "quantity": 25.0,
+      "averagePrice": 200.0,
+      "currentPrice": 220.0,
+      "currencyCode": "USD"
+    }
+  ],
+  "gbp_positions": [
+    {
+      "ticker": "VOD.L",
+      "quantity": 100.0,
+      "averagePrice": 1.25,
+      "currentPrice": 1.30,
+      "currencyCode": "GBP"
+    },
+    {
+      "ticker": "LLOY.L", 
+      "quantity": 500.0,
+      "averagePrice": 0.45,
+      "currentPrice": 0.50,
+      "currencyCode": "GBP"
+    }
+  ],
+  "empty_portfolio": [],
+  "fractional_shares": [
+    {
+      "ticker": "AMZN",
+      "quantity": 0.5,
+      "averagePrice": 3000.0,
+      "currentPrice": 3100.0,
+      "currencyCode": "USD"
+    }
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "authentication_error": {
+    "status_code": 401,
+    "error": "Unauthorized",
+    "message": "Invalid API key"
+  },
+  "permission_denied": {
+    "status_code": 403,
+    "error": "Forbidden", 
+    "message": "Access denied for this endpoint"
+  },
+  "rate_limit_exceeded": {
+    "status_code": 429,
+    "error": "Too Many Requests",
+    "message": "Rate limit exceeded. Try again later."
+  },
+  "server_error": {
+    "status_code": 500,
+    "error": "Internal Server Error",
+    "message": "An error occurred processing your request"
+  },
+  "network_timeout": {
+    "status_code": 504,
+    "error": "Gateway Timeout", 
+    "message": "Request timed out"
+  }
+}
