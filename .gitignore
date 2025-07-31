@@ -34,4 +34,5 @@ Thumbs.db
 
 *.md
 !readme.md
+!iterations.md
 */settings.local.json

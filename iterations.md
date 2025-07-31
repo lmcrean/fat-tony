@@ -1,0 +1,3 @@
+iteration 1: t212 to .md
+iteration 2: t212 to Google Docs (manual command)
+iteration 3: t212 to Google Docs -- .yml daily sync
