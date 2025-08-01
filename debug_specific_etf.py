@@ -93,9 +93,9 @@ def debug_specific_etf():
             
             # Check if this looks like pence
             if price >= 1000:
-                print(f"  🚨 SUSPICIOUS: Price {price} >= 1000 (likely pence, should be £{price/100:.2f})")
+                print(f"  *** SUSPICIOUS: Price {price} >= 1000 (likely pence, should be £{price/100:.2f})")
             else:
-                print(f"  ✅ NORMAL: Price {price} < 1000")
+                print(f"  OK: NORMAL: Price {price} < 1000")
 
 if __name__ == "__main__":
     debug_specific_etf()
