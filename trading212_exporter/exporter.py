@@ -30,6 +30,44 @@ class PortfolioExporter:
         self.positions: List[Position] = []
         self.account_summaries: Dict[str, AccountSummary] = {}
     
+    def _is_uk_etf_priced_in_pence(self, ticker: str, current_price: Decimal) -> bool:
+        """
+        Determine if a UK ETF is priced in pence (GBX) instead of pounds (GBP).
+        
+        UK ETFs can be priced in either pence or pounds on Trading 212.
+        This function uses heuristics to detect when prices are in pence.
+        """
+        # Known patterns for UK ETFs that are priced in pence
+        pence_ticker_patterns = [
+            'l_EQ',     # Many UK ETFs end with l_EQ (like SGLNl_EQ, INTLl_EQ)
+            'IITU_EQ',  # iShares S&P 500 IT - known to be in pence
+            'CNX1_EQ',  # iShares NASDAQ 100 - known to be in pence
+        ]
+        
+        # Check ticker patterns
+        ticker_suggests_pence = any(pattern in ticker for pattern in pence_ticker_patterns)
+        
+        # Price heuristic: if GBP price > 1000, it's likely pence
+        # (very few legitimate GBP stock prices exceed £1000)
+        price_suggests_pence = current_price >= 1000
+        
+        # US stocks should never be converted (they have _US_EQ suffix)
+        is_us_stock = '_US_EQ' in ticker
+        
+        # Only convert if:
+        # 1. Not a US stock, AND
+        # 2. Either ticker pattern suggests pence OR price suggests pence
+        should_convert = not is_us_stock and (ticker_suggests_pence or price_suggests_pence)
+        
+        if should_convert:
+            print(f"    Detected pence pricing for {ticker}: {current_price} -> {current_price/100}")
+        
+        return should_convert
+    
+    def _convert_pence_to_pounds(self, value: Decimal) -> Decimal:
+        """Convert a price from pence to pounds by dividing by 100."""
+        return value / Decimal('100')
+    
     def fetch_data(self):
         """Fetch all necessary data from the API."""
         print("Fetching portfolio data from all accounts...")
@@ -72,12 +110,24 @@ class PortfolioExporter:
                 display_name = get_display_name(ticker, api_name)
                 print(f"  -> Using display name: {display_name}")
                 
+                # Get raw price data
+                raw_avg_price = Decimal(str(position_data['averagePrice']))
+                raw_current_price = Decimal(str(position_data['currentPrice']))
+                
+                # Check if this UK ETF is priced in pence and needs conversion
+                if self._is_uk_etf_priced_in_pence(ticker, raw_current_price):
+                    avg_price = self._convert_pence_to_pounds(raw_avg_price)
+                    current_price = self._convert_pence_to_pounds(raw_current_price)
+                else:
+                    avg_price = raw_avg_price
+                    current_price = raw_current_price
+                
                 position = Position(
                     ticker=ticker,
                     name=display_name,
                     shares=Decimal(str(position_data['quantity'])),
-                    average_price=Decimal(str(position_data['averagePrice'])),
-                    current_price=Decimal(str(position_data['currentPrice'])),
+                    average_price=avg_price,
+                    current_price=current_price,
                     currency=position_data.get('currencyCode', account_currency),
                     account_name=account_name
                 )
