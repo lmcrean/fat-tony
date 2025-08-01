@@ -1,5 +1,8 @@
 # Environment variables
 .env
+e2e/.env
+e2e/.env.local
+e2e/.env.prod
 
 # Python
 __pycache__/
@@ -37,3 +40,5 @@ Thumbs.db
 !iterations.md
 */settings.local.json
 source_of_truth/*
+
+*.csv

@@ -8,9 +8,11 @@ final markdown generation and file output, using realistic data patterns.
 import pytest
 import tempfile
 import time
+import os
 from pathlib import Path
 from decimal import Decimal
 from unittest.mock import Mock, patch
+from dotenv import load_dotenv
 
 from trading212_exporter import Trading212Client, PortfolioExporter
 
@@ -461,3 +463,153 @@ class TestE2EWorkflow:
         print(f"  Avg total time: {avg_total:.3f}s")
         print(f"  Fetch time range: {min(fetch_times):.3f}s - {max(fetch_times):.3f}s")
         print(f"  Generation time range: {min(generation_times):.3f}s - {max(generation_times):.3f}s")
+    
+    def test_totals_spot_check(self, tmp_path):
+        """Test account totals against reference data from e2e/.env file."""
+        print("\n=== Totals Spot Check Test ===")
+        
+        # Load e2e test configuration
+        e2e_env_path = Path(__file__).parent / ".env"
+        if not e2e_env_path.exists():
+            pytest.skip(f"E2E test data not found at {e2e_env_path}. Create e2e/.env with test values.")
+        
+        load_dotenv(e2e_env_path)
+        
+        # Load reference data from environment
+        t212_cash_min = Decimal(os.getenv("T212_CASH_MIN", "0"))
+        t212_cash_max = Decimal(os.getenv("T212_CASH_MAX", "10"))
+        t212_investments = Decimal(os.getenv("T212_INVESTMENTS", "8450.0"))
+        
+        isa_cash = Decimal(os.getenv("ISA_CASH", "7128.0"))
+        isa_investments = Decimal(os.getenv("ISA_INVESTMENTS", "6801.0"))
+        
+        combined_investments = Decimal(os.getenv("COMBINED_INVESTMENTS", "15251.0"))
+        combined_cash_min = Decimal(os.getenv("COMBINED_CASH_MIN", "7128.0"))
+        combined_cash_max = Decimal(os.getenv("COMBINED_CASH_MAX", "7138.0"))
+        
+        # Account names
+        t212_account_name = os.getenv("T212_ACCOUNT_NAME", "T212 Account")
+        isa_account_name = os.getenv("ISA_ACCOUNT_NAME", "Stocks & Shares ISA")
+        default_currency = os.getenv("DEFAULT_CURRENCY", "GBP")
+        
+        # Dummy position data
+        t212_dummy_ticker = os.getenv("T212_DUMMY_TICKER", "DUMMY_T212_EQ")
+        t212_dummy_shares = float(os.getenv("T212_DUMMY_SHARES", "100.0"))
+        t212_dummy_avg_price = float(os.getenv("T212_DUMMY_AVG_PRICE", "84.50"))
+        t212_dummy_name = os.getenv("T212_DUMMY_NAME", "Dummy T212 Position")
+        
+        isa_dummy_ticker = os.getenv("ISA_DUMMY_TICKER", "DUMMY_ISA_EQ")
+        isa_dummy_shares = float(os.getenv("ISA_DUMMY_SHARES", "100.0"))
+        isa_dummy_avg_price = float(os.getenv("ISA_DUMMY_AVG_PRICE", "68.01"))
+        isa_dummy_name = os.getenv("ISA_DUMMY_NAME", "Dummy ISA Position")
+        
+        print(f"Reference data loaded from {e2e_env_path}")
+        print(f"Expected - {t212_account_name}: Cash £{t212_cash_min}-{t212_cash_max}, Investments £{t212_investments}")
+        print(f"Expected - {isa_account_name}: Cash £{isa_cash}, Investments £{isa_investments}")
+        
+        # Create T212 Account client
+        t212_client = Mock(spec=Trading212Client)
+        t212_client.get_portfolio.return_value = [
+            {
+                "ticker": t212_dummy_ticker,
+                "quantity": t212_dummy_shares,
+                "averagePrice": t212_dummy_avg_price,
+                "currentPrice": t212_dummy_avg_price,  # No profit/loss for simplicity
+                "ppl": 0.0,
+                "fxPpl": 0.0,
+                "pieQuantity": 0.0
+            }
+        ]
+        # Use midpoint of cash range for test
+        t212_test_cash = float((t212_cash_min + t212_cash_max) / 2)
+        t212_client.get_account_cash.return_value = {
+            "free": t212_test_cash,
+            "invested": float(t212_investments),
+            "result": 0.0,
+            "currency": default_currency
+        }
+        t212_client.get_account_metadata.return_value = {
+            "accountType": "INVEST",
+            "currency": default_currency
+        }
+        t212_client.get_position_details.return_value = {"name": t212_dummy_name}
+        
+        # Create ISA client
+        isa_client = Mock(spec=Trading212Client)
+        isa_client.get_portfolio.return_value = [
+            {
+                "ticker": isa_dummy_ticker,
+                "quantity": isa_dummy_shares,
+                "averagePrice": isa_dummy_avg_price,
+                "currentPrice": isa_dummy_avg_price,  # No profit/loss for simplicity
+                "ppl": 0.0,
+                "fxPpl": 0.0,
+                "pieQuantity": 0.0
+            }
+        ]
+        isa_client.get_account_cash.return_value = {
+            "free": float(isa_cash),
+            "invested": float(isa_investments),
+            "result": 0.0,
+            "currency": default_currency
+        }
+        isa_client.get_account_metadata.return_value = {
+            "accountType": "ISA",
+            "currency": default_currency
+        }
+        isa_client.get_position_details.return_value = {"name": isa_dummy_name}
+        
+        # Create multi-account exporter
+        exporter = PortfolioExporter({
+            t212_account_name: t212_client,
+            isa_account_name: isa_client
+        })
+        
+        print("Testing totals against reference data...")
+        exporter.fetch_data()
+        
+        # Validate account summaries
+        assert len(exporter.account_summaries) == 2
+        assert t212_account_name in exporter.account_summaries
+        assert isa_account_name in exporter.account_summaries
+        
+        # Validate T212 Account totals
+        t212_account = exporter.account_summaries[t212_account_name]
+        print(f"{t212_account_name} - Cash: £{t212_account.free_funds}, Investments: £{t212_account.invested}")
+        
+        # Cash should be within expected range
+        assert t212_cash_min <= t212_account.free_funds <= t212_cash_max, \
+            f"{t212_account_name} cash £{t212_account.free_funds} not in expected range £{t212_cash_min}-{t212_cash_max}"
+        
+        # Investments should match exactly
+        assert t212_account.invested == t212_investments, \
+            f"{t212_account_name} investments £{t212_account.invested} != expected £{t212_investments}"
+        
+        # Validate ISA totals
+        isa_account = exporter.account_summaries[isa_account_name]
+        print(f"{isa_account_name} - Cash: £{isa_account.free_funds}, Investments: £{isa_account.invested}")
+        
+        assert isa_account.free_funds == isa_cash, \
+            f"{isa_account_name} cash £{isa_account.free_funds} != expected £{isa_cash}"
+        
+        assert isa_account.invested == isa_investments, \
+            f"{isa_account_name} investments £{isa_account.invested} != expected £{isa_investments}"
+        
+        # Validate combined totals
+        total_investments = t212_account.invested + isa_account.invested
+        total_cash = t212_account.free_funds + isa_account.free_funds
+        
+        print(f"Combined - Cash: £{total_cash}, Investments: £{total_investments}")
+        
+        assert total_investments == combined_investments, \
+            f"Combined investments £{total_investments} != expected £{combined_investments}"
+        
+        # Combined cash should be within expected range
+        assert combined_cash_min <= total_cash <= combined_cash_max, \
+            f"Combined cash £{total_cash} not in expected range £{combined_cash_min}-{combined_cash_max}"
+        
+        print("✓ Totals spot check test passed")
+        print(f"  {t212_account_name}: Cash £{t212_account.free_funds}, Investments £{t212_account.invested}")
+        print(f"  {isa_account_name}: Cash £{isa_account.free_funds}, Investments £{isa_account.invested}")
+        print(f"  Combined: Cash £{total_cash}, Investments £{total_investments}")
+        print(f"  All totals match reference data from e2e/.env")

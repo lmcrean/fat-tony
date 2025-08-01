@@ -331,3 +331,116 @@ class TestPortfolioExporter:
         assert "Trading 212" in exporter.account_summaries
         account_summary = exporter.account_summaries["Trading 212"]
         assert account_summary.free_funds == Decimal("0")
+    
+    def test_format_currency_csv(self, exporter):
+        """Test CSV currency formatting (no symbols)."""
+        assert exporter._format_currency_csv(Decimal("100.50"), "GBP") == "100.50"
+        assert exporter._format_currency_csv(Decimal("1000.00"), "USD") == "1,000.00"
+        assert exporter._format_currency_csv(Decimal("0.01"), "GBP") == "0.01"
+    
+    def test_format_percentage_csv(self, exporter):
+        """Test CSV percentage formatting (no color indicators)."""
+        assert exporter._format_percentage_csv(Decimal("10.50")) == "+10.50%"
+        assert exporter._format_percentage_csv(Decimal("-5.25")) == "-5.25%"
+        assert exporter._format_percentage_csv(Decimal("0.00")) == "+0.00%"
+    
+    def test_format_profit_loss_csv(self, exporter):
+        """Test CSV profit/loss formatting (no color indicators)."""
+        assert exporter._format_profit_loss_csv(Decimal("100.00")) == "+100.00"
+        assert exporter._format_profit_loss_csv(Decimal("-50.00")) == "-50.00"
+        assert exporter._format_profit_loss_csv(Decimal("0.00")) == "+0.00"
+    
+    def test_generate_positions_csv(self, exporter, sample_positions, sample_account_summary):
+        """Test CSV positions generation."""
+        exporter.positions = sample_positions
+        exporter.account_summaries["Trading 212"] = sample_account_summary
+        
+        csv_data = exporter.generate_positions_csv()
+        
+        # Check header
+        assert "Trading 212 Portfolio Positions" in csv_data[0][0]
+        assert "Generated on" in csv_data[0][0]
+        
+        # Check column headers
+        headers = csv_data[2]
+        expected_headers = ["NAME", "SHARES", "AVERAGE_PRICE", "CURRENT_PRICE", "MARKET_VALUE", "RESULT", "RESULT_%", "CURRENCY"]
+        assert headers == expected_headers
+        
+        # Check position data (sorted by market value, Alphabet should be first)
+        alphabet_row = csv_data[3]
+        assert alphabet_row[0] == "Alphabet Inc."
+        assert alphabet_row[1] == "5"
+        assert alphabet_row[2] == "2,000.00"
+        assert alphabet_row[3] == "1,900.00"
+        assert alphabet_row[4] == "9,500.00"
+        assert alphabet_row[5] == "-500.00"
+        assert alphabet_row[6] == "-5.00%"
+        assert alphabet_row[7] == "USD"
+        
+        # Check Apple row (second largest)
+        apple_row = csv_data[4]
+        assert apple_row[0] == "Apple Inc."
+        assert apple_row[1] == "10"
+        assert apple_row[2] == "150.00"
+        assert apple_row[3] == "160.00"
+        assert apple_row[4] == "1,600.00"
+        assert apple_row[5] == "+100.00"
+        assert apple_row[6] == "+6.67%"
+        assert apple_row[7] == "USD"
+    
+    def test_generate_summary_csv(self, exporter, sample_positions, sample_account_summary):
+        """Test CSV summary generation."""
+        exporter.positions = sample_positions
+        exporter.account_summaries["Trading 212"] = sample_account_summary
+        
+        csv_data = exporter.generate_summary_csv()
+        
+        # Check header
+        assert "Trading 212 Portfolio Summary" in csv_data[0][0]
+        
+        # Check summary structure
+        assert csv_data[2] == ["SUMMARY"]
+        assert csv_data[3] == ["FREE_FUNDS", "PORTFOLIO", "RESULT", "CURRENCY"]
+        
+        # Check summary data
+        summary_row = csv_data[4]
+        assert summary_row[0] == "1,000.00"
+        assert summary_row[1] == "11,100.00"
+        assert summary_row[2] == "-400.00"
+        assert summary_row[3] == "USD"
+    
+    def test_save_to_csv(self, exporter, sample_positions, sample_account_summary):
+        """Test saving CSV to files."""
+        exporter.positions = sample_positions
+        exporter.account_summaries["Trading 212"] = sample_account_summary
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='_positions.csv', delete=False) as pos_file, \
+             tempfile.NamedTemporaryFile(mode='w', suffix='_summary.csv', delete=False) as sum_file:
+            pos_filename = pos_file.name
+            sum_filename = sum_file.name
+        
+        try:
+            exporter.save_to_csv(pos_filename, sum_filename)
+            
+            # Verify both files were created
+            assert os.path.exists(pos_filename)
+            assert os.path.exists(sum_filename)
+            
+            # Verify positions file content
+            with open(pos_filename, 'r', encoding='utf-8') as f:
+                pos_content = f.read()
+            assert "Apple Inc." in pos_content
+            assert "Alphabet Inc." in pos_content
+            assert "160.00" in pos_content
+            
+            # Verify summary file content  
+            with open(sum_filename, 'r', encoding='utf-8') as f:
+                sum_content = f.read()
+            assert "SUMMARY" in sum_content
+            assert "1,000.00" in sum_content
+            
+        finally:
+            # Clean up
+            for filename in [pos_filename, sum_filename]:
+                if os.path.exists(filename):
+                    os.unlink(filename)
