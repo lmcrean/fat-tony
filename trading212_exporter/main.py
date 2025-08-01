@@ -2,6 +2,7 @@
 Main entry point for the Trading 212 Portfolio Exporter.
 """
 
+import argparse
 import os
 import sys
 from dotenv import load_dotenv
@@ -12,6 +13,12 @@ from .exporter import PortfolioExporter
 
 def main():
     """Main execution function."""
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Export Trading 212 portfolio data')
+    parser.add_argument('--format', choices=['markdown', 'csv', 'both'], default='both',
+                      help='Export format (default: both)')
+    args = parser.parse_args()
+    
     # Load environment variables
     load_dotenv()
     
@@ -50,8 +57,12 @@ def main():
         # Fetch data from all accounts
         exporter.fetch_data()
         
-        # Generate and save markdown
-        exporter.save_to_file()
+        # Export based on format choice
+        if args.format in ['markdown', 'both']:
+            exporter.save_to_file()
+        
+        if args.format in ['csv', 'both']:
+            exporter.save_to_csv()
         
     except KeyboardInterrupt:
         print("\nExport cancelled by user")

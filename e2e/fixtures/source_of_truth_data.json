@@ -1,0 +1,83 @@
+{
+  "description": "Reference data from Trading 212 app for spot check validation",
+  "collection_date": "2025-08-01",
+  "account_type": "INVEST",
+  "currency": "GBP",
+  "target_tickers": [
+    {
+      "ticker": "IITU_EQ",
+      "name": "iShares S&P 500 Information Technology Sector (Acc)",
+      "shares": 41.49,
+      "average_price_display": "p2,428.33",
+      "average_price_numeric": 24.2833,
+      "current_price_display": "p2,827.00", 
+      "current_price_numeric": 28.27,
+      "market_value_display": "£1,172.92",
+      "market_value_numeric": 1172.92,
+      "profit_loss_display": "+£165.41",
+      "profit_loss_numeric": 165.41,
+      "profit_loss_percent_display": "+16.42%",
+      "profit_loss_percent_numeric": 16.42,
+      "notes": "Prices in pence, displayed as p notation"
+    },
+    {
+      "ticker": "INTLl_EQ",
+      "name": "WisdomTree Artificial Intelligence (Acc)",
+      "shares": 4.24,
+      "average_price_display": "p5,133.7",
+      "average_price_numeric": 51.337,
+      "current_price_display": "p5,557.5",
+      "current_price_numeric": 55.575,
+      "market_value_display": "£235.64",
+      "market_value_numeric": 235.64,
+      "profit_loss_display": "+£17.97",
+      "profit_loss_numeric": 17.97,
+      "profit_loss_percent_display": "+8.26%",
+      "profit_loss_percent_numeric": 8.26,
+      "notes": "Prices in pence, displayed as p notation"
+    },
+    {
+      "ticker": "CNX1_EQ",
+      "name": "iShares NASDAQ 100 (Acc)",
+      "shares": 0.142,
+      "average_price_display": "p94,047.7",
+      "average_price_numeric": 940.477,
+      "current_price_display": "p98,520.0",
+      "current_price_numeric": 985.20,
+      "market_value_display": "£139.90",
+      "market_value_numeric": 139.90,
+      "profit_loss_display": "+£6.35",
+      "profit_loss_numeric": 6.35,
+      "profit_loss_percent_display": "+4.75%",
+      "profit_loss_percent_numeric": 4.75,
+      "notes": "Prices in pence, displayed as p notation"
+    }
+  ],
+  "validation_notes": {
+    "price_conversion": "Trading 212 displays ETF prices in pence (p) but API may return in pounds. Test should handle both formats.",
+    "calculation_precision": "All calculations should maintain precision to 2 decimal places for currency, 3 for percentages",
+    "rounding_rules": "Market values and profit/loss should round to nearest penny",
+    "display_formatting": "Positive values should show + prefix, currency symbols should be preserved"
+  },
+  "expected_calculations": {
+    "IITU_EQ": {
+      "cost_basis": "41.49 × 24.2833 = £1,007.513817 → £1,007.51",
+      "market_value": "41.49 × 28.27 = £1,172.9223 → £1,172.92", 
+      "profit_loss": "£1,172.92 - £1,007.51 = £165.41",
+      "profit_loss_percent": "(£165.41 / £1,007.51) × 100 = 16.42%"
+    },
+    "INTLl_EQ": {
+      "cost_basis": "4.24 × 51.337 = £217.66888 → £217.67",
+      "market_value": "4.24 × 55.575 = £235.638 → £235.64",
+      "profit_loss": "£235.64 - £217.67 = £17.97", 
+      "profit_loss_percent": "(£17.97 / £217.67) × 100 = 8.26%"
+    },
+    "CNX1_EQ": {
+      "cost_basis": "0.142 × 940.477 = £133.547734 → £133.55",
+      "market_value": "0.142 × 985.20 = £139.9784 → £139.98",
+      "profit_loss": "£139.98 - £133.55 = £6.43",
+      "profit_loss_percent": "(£6.43 / £133.55) × 100 = 4.81%",
+      "discrepancy_note": "Source shows £139.90 and +£6.35 (+4.75%) - may indicate rounding differences or timing"
+    }
+  }
+}

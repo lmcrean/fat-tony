@@ -2,6 +2,7 @@
 Portfolio data processing and markdown generation.
 """
 
+import csv
 from typing import List, Optional, Dict
 from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
@@ -131,6 +132,18 @@ class PortfolioExporter:
             return f"🔴 {formatted}"
         else:
             return f"⚪ {formatted}"
+    
+    def _format_currency_csv(self, value: Decimal, currency: str = "GBP") -> str:
+        """Format a decimal value as currency for CSV (no symbols)."""
+        return f"{value.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP):,.2f}"
+    
+    def _format_percentage_csv(self, value: Decimal) -> str:
+        """Format a decimal value as percentage for CSV (no color indicators)."""
+        return f"{value.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP):+.2f}%"
+    
+    def _format_profit_loss_csv(self, value: Decimal) -> str:
+        """Format profit/loss for CSV (no color indicators)."""
+        return f"{value.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP):+,.2f}"
     
     def generate_markdown(self) -> str:
         """Generate the markdown output."""
@@ -264,6 +277,107 @@ class PortfolioExporter:
         
         return "\n".join(lines)
     
+    def generate_positions_csv(self) -> List[List[str]]:
+        """Generate CSV data for positions only."""
+        csv_data = []
+        
+        # Add header with timestamp
+        csv_data.append([f"Trading 212 Portfolio Positions - Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"])
+        csv_data.append([])  # Empty row
+        
+        # Check if we have multiple accounts
+        if len(self.clients) > 1:
+            # Multi-account view: include account column
+            csv_data.append(["ACCOUNT", "NAME", "SHARES", "AVERAGE_PRICE", "CURRENT_PRICE", "MARKET_VALUE", "RESULT", "RESULT_%", "CURRENCY"])
+            
+            for account_name in self.clients.keys():
+                account_positions = [p for p in self.positions if p.account_name == account_name]
+                
+                for position in sorted(account_positions, key=lambda p: p.market_value, reverse=True):
+                    csv_data.append([
+                        account_name,
+                        position.name,
+                        f"{position.shares:,.4f}".rstrip('0').rstrip('.'),
+                        self._format_currency_csv(position.average_price),
+                        self._format_currency_csv(position.current_price),
+                        self._format_currency_csv(position.market_value),
+                        self._format_profit_loss_csv(position.profit_loss),
+                        self._format_percentage_csv(position.profit_loss_percent),
+                        position.currency
+                    ])
+        else:
+            # Single account view
+            csv_data.append(["NAME", "SHARES", "AVERAGE_PRICE", "CURRENT_PRICE", "MARKET_VALUE", "RESULT", "RESULT_%", "CURRENCY"])
+            
+            for position in sorted(self.positions, key=lambda p: p.market_value, reverse=True):
+                csv_data.append([
+                    position.name,
+                    f"{position.shares:,.4f}".rstrip('0').rstrip('.'),
+                    self._format_currency_csv(position.average_price),
+                    self._format_currency_csv(position.current_price),
+                    self._format_currency_csv(position.market_value),
+                    self._format_profit_loss_csv(position.profit_loss),
+                    self._format_percentage_csv(position.profit_loss_percent),
+                    position.currency
+                ])
+        
+        return csv_data
+    
+    def generate_summary_csv(self) -> List[List[str]]:
+        """Generate CSV data for summary only."""
+        csv_data = []
+        
+        # Add header with timestamp
+        csv_data.append([f"Trading 212 Portfolio Summary - Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"])
+        csv_data.append([])  # Empty row
+        
+        # Check if we have multiple accounts
+        if len(self.clients) > 1:
+            csv_data.append(["ACCOUNT SUMMARIES"])
+            csv_data.append(["ACCOUNT", "FREE_FUNDS", "PORTFOLIO", "RESULT", "CURRENCY"])
+            
+            for account_name, summary in self.account_summaries.items():
+                csv_data.append([
+                    account_name,
+                    self._format_currency_csv(summary.free_funds),
+                    self._format_currency_csv(summary.invested),
+                    self._format_profit_loss_csv(summary.result),
+                    summary.currency
+                ])
+            
+            # Combined totals if all accounts use same currency
+            currencies = set(summary.currency for summary in self.account_summaries.values())
+            if len(currencies) == 1:
+                currency = currencies.pop()
+                total_free_funds = sum(s.free_funds for s in self.account_summaries.values())
+                total_invested = sum(s.invested for s in self.account_summaries.values())
+                total_result = sum(s.result for s in self.account_summaries.values())
+                
+                csv_data.append([])
+                csv_data.append(["COMBINED TOTALS"])
+                csv_data.append(["TOTAL_FREE_FUNDS", "TOTAL_PORTFOLIO", "TOTAL_RESULT", "CURRENCY"])
+                csv_data.append([
+                    self._format_currency_csv(total_free_funds),
+                    self._format_currency_csv(total_invested),
+                    self._format_profit_loss_csv(total_result),
+                    currency
+                ])
+        else:
+            # Single account view
+            account_name = list(self.account_summaries.keys())[0]
+            if account_name in self.account_summaries:
+                summary = self.account_summaries[account_name]
+                csv_data.append(["SUMMARY"])
+                csv_data.append(["FREE_FUNDS", "PORTFOLIO", "RESULT", "CURRENCY"])
+                csv_data.append([
+                    self._format_currency_csv(summary.free_funds),
+                    self._format_currency_csv(summary.invested),
+                    self._format_profit_loss_csv(summary.result),
+                    summary.currency
+                ])
+        
+        return csv_data
+    
     def save_to_file(self, filename: str = "portfolio.md"):
         """Save the markdown output to a file."""
         markdown_content = self.generate_markdown()
@@ -272,3 +386,19 @@ class PortfolioExporter:
             f.write(markdown_content)
         
         print(f"\nPortfolio exported successfully to {filename}")
+    
+    def save_to_csv(self, positions_filename: str = "portfolio_positions.csv", summary_filename: str = "portfolio_summary.csv"):
+        """Save the CSV output to separate files for positions and summary."""
+        # Save positions CSV
+        positions_data = self.generate_positions_csv()
+        with open(positions_filename, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerows(positions_data)
+        
+        # Save summary CSV
+        summary_data = self.generate_summary_csv()
+        with open(summary_filename, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerows(summary_data)
+        
+        print(f"Portfolio exported successfully to {positions_filename} and {summary_filename}")
