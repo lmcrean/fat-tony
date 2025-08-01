@@ -10,6 +10,7 @@ from tabulate import tabulate
 
 from .models import Position, AccountSummary
 from .client import Trading212Client
+from .ticker_mappings import get_display_name
 
 
 class PortfolioExporter:
@@ -46,6 +47,11 @@ class PortfolioExporter:
             
             # Get portfolio positions
             portfolio_data = client.get_portfolio()
+            print(f"Found {len(portfolio_data)} positions in {account_name}")
+            
+            # Log all tickers for debugging
+            tickers = [p['ticker'] for p in portfolio_data]
+            print(f"Tickers: {', '.join(tickers)}")
             
             # Process each position
             for position_data in portfolio_data:
@@ -53,32 +59,28 @@ class PortfolioExporter:
                 
                 # Get detailed position info
                 print(f"Fetching details for {ticker}...")
+                api_name = None
                 try:
                     details = client.get_position_details(ticker)
-                    
-                    position = Position(
-                        ticker=ticker,
-                        name=details.get('name', ticker),
-                        shares=Decimal(str(position_data['quantity'])),
-                        average_price=Decimal(str(position_data['averagePrice'])),
-                        current_price=Decimal(str(position_data['currentPrice'])),
-                        currency=position_data.get('currencyCode', account_currency),
-                        account_name=account_name
-                    )
-                    self.positions.append(position)
+                    api_name = details.get('name', ticker)
                 except Exception as e:
-                    print(f"Error fetching details for {ticker}: {e}")
-                    # Use basic data if detailed fetch fails
-                    position = Position(
-                        ticker=ticker,
-                        name=ticker,
-                        shares=Decimal(str(position_data['quantity'])),
-                        average_price=Decimal(str(position_data['averagePrice'])),
-                        current_price=Decimal(str(position_data['currentPrice'])),
-                        currency=position_data.get('currencyCode', account_currency),
-                        account_name=account_name
-                    )
-                    self.positions.append(position)
+                    print(f"Warning: Could not fetch details for {ticker}: {e}")
+                    print(f"Using ticker mapping for display name")
+                
+                # Use the ticker mapping to get a proper display name
+                display_name = get_display_name(ticker, api_name)
+                print(f"  -> Using display name: {display_name}")
+                
+                position = Position(
+                    ticker=ticker,
+                    name=display_name,
+                    shares=Decimal(str(position_data['quantity'])),
+                    average_price=Decimal(str(position_data['averagePrice'])),
+                    current_price=Decimal(str(position_data['currentPrice'])),
+                    currency=position_data.get('currencyCode', account_currency),
+                    account_name=account_name
+                )
+                self.positions.append(position)
             
             # Get cash balance (optional - may fail due to API permissions)
             print("Fetching cash balance...")
