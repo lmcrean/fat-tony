@@ -34,30 +34,22 @@ class PortfolioExporter:
         """
         Determine if a UK ETF is priced in pence (GBX) instead of pounds (GBP).
         
-        UK ETFs can be priced in either pence or pounds on Trading 212.
-        This function uses heuristics to detect when prices are in pence.
+        Based on analysis of Trading 212 API data, certain UK ETFs return prices in pence
+        while others return prices in pounds. This function identifies which need conversion.
         """
-        # Known patterns for UK ETFs that are priced in pence
-        pence_ticker_patterns = [
-            'l_EQ',     # Many UK ETFs end with l_EQ (like SGLNl_EQ, INTLl_EQ)
-            'IITU_EQ',  # iShares S&P 500 IT - known to be in pence
-            'CNX1_EQ',  # iShares NASDAQ 100 - known to be in pence
-        ]
-        
-        # Check ticker patterns
-        ticker_suggests_pence = any(pattern in ticker for pattern in pence_ticker_patterns)
-        
-        # Price heuristic: if GBP price > 1000, it's likely pence
-        # (very few legitimate GBP stock prices exceed £1000)
-        price_suggests_pence = current_price >= 1000
+        # Specific tickers confirmed to be priced in pence (from source of truth analysis)
+        known_pence_tickers = {
+            'IITU_EQ',   # iShares S&P 500 IT - price ~2827 should be ~£28.27
+            'INTLl_EQ',  # WisdomTree AI - price ~5557 should be ~£55.57
+            'SGLNl_EQ',  # iShares Physical Gold - price ~4910 should be ~£49.10
+            'CNX1_EQ',   # iShares NASDAQ 100 - price ~98520 should be ~£985.20
+        }
         
         # US stocks should never be converted (they have _US_EQ suffix)
         is_us_stock = '_US_EQ' in ticker
         
-        # Only convert if:
-        # 1. Not a US stock, AND
-        # 2. Either ticker pattern suggests pence OR price suggests pence
-        should_convert = not is_us_stock and (ticker_suggests_pence or price_suggests_pence)
+        # Only convert specific known pence tickers that are not US stocks
+        should_convert = not is_us_stock and ticker in known_pence_tickers
         
         if should_convert:
             print(f"    Detected pence pricing for {ticker}: {current_price} -> {current_price/100}")
