@@ -164,6 +164,11 @@ class PortfolioExporter:
         if ticker.endswith('_US_EQ'):
             return 'USD'
         
+        # European ETFs - check these first before UK ETF catch-all
+        if ('DAX' in ticker or ticker.endswith('d_EQ') or 
+            'FXAC' in ticker or 'EXIC' in ticker):
+            return 'EUR'
+        
         # UK ETFs ending in .L or non-US _EQ are typically in GBX/GBP
         if ticker.endswith('.L') or (ticker.endswith('_EQ') and not ticker.endswith('_US_EQ')):
             # Large values (>1000) are likely in pence for UK instruments
@@ -174,12 +179,6 @@ class PortfolioExporter:
                 return 'GBX'
             else:
                 return 'GBP'
-        
-        # European ETFs might be in EUR
-        if 'DAX' in ticker or ticker.endswith('d_EQ'):
-            # Check if this looks like EUR pricing
-            if Decimal('1') < price < Decimal('100'):
-                return 'EUR'
         
         # Default to reported currency
         return reported_currency
