@@ -1,9 +1,73 @@
 import csv
 import re
 from pathlib import Path
+from typing import Dict, Optional, Tuple
 
 
-def parse_currency_value(value_str):
+# Exchange rates (approximate, as of August 2025)
+EXCHANGE_RATES = {
+    'USD': 0.787,  # 1 USD = 0.787 GBP
+    'EUR': 0.833,  # 1 EUR = 0.833 GBP
+    'GBX': 0.01,   # 1 pence = 0.01 GBP
+    'GBP': 1.0     # 1 GBP = 1 GBP
+}
+
+# Ticker mappings for common stocks and ETFs
+TICKER_MAPPINGS = {
+    'Palantir': 'PLTR',
+    'Nvidia': 'NVDA',
+    'Rightmove': 'RMV.L',
+    'Broadcom': 'AVGO',
+    'Oracle': 'ORCL',
+    'Shopify': 'SHOP',
+    'iShares Physical Gold': 'SGLN.L',
+    'Microsoft': 'MSFT',
+    'Visa': 'V',
+    'iShares Blockchain Technology': 'IBLC.L',
+    'Spotify Technology': 'SPOT',
+    'Meta Platforms': 'META',
+    'iShares S&P 500 Information Technology Sector (Acc)': 'IITU.L',
+    'VanEck Semiconductor (Acc)': 'SMH',
+    'Mastercard': 'MA',
+    'iShares Automation & Robotics (Dist)': 'RBOT.L',
+    'Netflix': 'NFLX',
+    'iShares Russell 1000 Growth': 'IWF',
+    'Axon Enterprise': 'AXON',
+    'WisdomTree Artificial Intelligence (Acc)': 'WTAI.L',
+    'Alphabet (Class A)': 'GOOGL',
+    'Vanguard Germany All Cap': 'VGEM.L',
+    'iShares NASDAQ 100 (Acc)': 'CNX1.L',
+    'Vanguard S&P 500 (Acc)': 'VUSA.L',
+    'Uber Technologies': 'UBER',
+    'Hims & Hers Health': 'HIMS',
+    'Vanguard FTSE All-World (Acc)': 'VWRL.L',
+    'Reddit': 'RDDT',
+    'iShares China Large Cap (Acc)': 'IUKD.L',
+    'MicroStrategy': 'MSTR',
+    'ASML': 'ASML',
+    'Amazon': 'AMZN',
+    'Progressive': 'PGR',
+    'Intuitive Surgical': 'ISRG',
+    'Figma': 'FIGMA',  # Private company
+    'Shares China Large Cap (Acc)': 'IUKD.L',
+    'iShares Core DAX DE (Dist)': 'DAXE.L',
+    'iShares MSCI India (Acc)': 'IIND.L'
+}
+
+
+def convert_to_gbp(amount: float, currency: str) -> float:
+    """Convert amount to GBP using exchange rates."""
+    if currency in EXCHANGE_RATES:
+        return round(amount * EXCHANGE_RATES[currency], 2)
+    return amount  # Return as-is if currency not found
+
+
+def get_ticker(name: str) -> str:
+    """Get ticker symbol for a given instrument name."""
+    return TICKER_MAPPINGS.get(name, name.upper().replace(' ', '')[:8])
+
+
+def parse_currency_value(value_str: str) -> Tuple[float, str]:
     """Parse currency values with symbols and return (amount, currency)."""
     value_str = value_str.strip()
     
@@ -108,43 +172,59 @@ def parse_markdown_data(file_path):
         if len(values) >= 6:
             try:
                 # Parse each value
-                position_data['Quantity'] = float(values[0])
+                quantity = float(values[0])
                 
                 price_owned, price_currency = parse_currency_value(values[1])
-                position_data['Price Owned'] = price_owned
-                position_data['Price Currency'] = price_currency
                 
                 # For ISA "Shares China Large Cap", it seems to be missing current price
                 # Check if the third value looks like a currency value or a current price
                 if len(values) >= 3 and (values[2].startswith(('$', '£', '€', 'p')) or '.' in values[2]):
                     current_price, current_currency = parse_currency_value(values[2])
-                    position_data['Current Price'] = current_price
-                    position_data['Current Currency'] = current_currency or price_currency
                     value_idx = 3
                 else:
                     # Missing current price, use price owned as current
-                    position_data['Current Price'] = price_owned
-                    position_data['Current Currency'] = price_currency
+                    current_price = price_owned
+                    current_currency = price_currency
                     value_idx = 2
                 
                 # Parse remaining values
+                value_gbp = 0
+                change_gbp = 0
+                change_pct = 0
+                
                 if value_idx < len(values):
                     value_gbp, _ = parse_currency_value(values[value_idx])
-                    position_data['Value (GBP)'] = value_gbp
                 
                 if value_idx + 1 < len(values):
                     change_gbp, _ = parse_currency_value(values[value_idx + 1])
-                    position_data['Change (GBP)'] = change_gbp
                 
                 if value_idx + 2 < len(values):
                     change_pct, _ = parse_currency_value(values[value_idx + 2])
-                    position_data['Change %'] = change_pct
+                
+                # Build position data with proper CSV format
+                position_data = {
+                    'Account Type': current_account,
+                    'Name': name,
+                    'Ticker': get_ticker(name),
+                    'Quantity of Shares': quantity,
+                    'Price owned Currency': price_currency or 'GBP',
+                    'Current Price Currency': current_currency or price_currency or 'GBP',
+                    'Price Owned': price_owned,
+                    'Price Owned (GBP)': convert_to_gbp(price_owned, price_currency or 'GBP'),
+                    'Current Price': current_price,
+                    'Current Price (GBP)': convert_to_gbp(current_price, current_currency or price_currency or 'GBP'),
+                    'Value (GBP)': value_gbp,
+                    'Change (GBP)': change_gbp,
+                    'Change %': change_pct
+                }
                 
                 data.append(position_data)
-                print(f"Parsed: {name} in {current_account} account")
+                # Debug output for parsing
+                print(f"Parsed: {name} ({get_ticker(name)}) in {current_account} account - £{value_gbp}")
                 
             except (ValueError, IndexError) as e:
-                print(f"Failed to parse {name}: {e}")
+                print(f"Failed to parse {name}: {e} (values: {values})")
+                # Continue parsing other positions even if one fails
         
         # Move to the next potential stock name
         i = j if j < len(lines) else i + 1
@@ -158,11 +238,12 @@ def write_csv(data, output_path):
         print("No data to write!")
         return
     
-    # Define the field names
+    # Define the exact field names as requested
     fieldnames = [
-        'Account Type', 'Name', 'Quantity', 
-        'Price Owned', 'Price Currency', 
-        'Current Price', 'Current Currency',
+        'Account Type', 'Name', 'Ticker', 'Quantity of Shares',
+        'Price owned Currency', 'Current Price Currency', 
+        'Price Owned', 'Price Owned (GBP)', 
+        'Current Price', 'Current Price (GBP)', 
         'Value (GBP)', 'Change (GBP)', 'Change %'
     ]
     
@@ -183,7 +264,7 @@ def main():
     # Define paths
     project_root = Path(__file__).parent.parent
     input_path = project_root / 'source_of_truth' / 'source_of_truth.md'
-    output_path = project_root / 'source_of_truth' / 'source_of_truth.csv'
+    output_path = project_root / 'source_of_truth' / 'source_of_truth.gbp.csv'
     
     print(f"Parsing: {input_path}")
     
@@ -195,7 +276,7 @@ def main():
     # Write to CSV
     write_csv(data, output_path)
     
-    print(f"CSV file created: {output_path}")
+    print(f"GBP CSV file created: {output_path}")
     
     # Print summary
     trading_positions = sum(1 for d in data if d['Account Type'] == 'Trading')
@@ -205,6 +286,12 @@ def main():
     print(f"  Trading Account positions: {trading_positions}")
     print(f"  ISA Account positions: {isa_positions}")
     print(f"  Total positions: {len(data)}")
+    
+    # Show sample of first few rows
+    if data:
+        print(f"\nSample data (first 3 positions):")
+        for i, pos in enumerate(data[:3]):
+            print(f"  {i+1}. {pos['Name']} ({pos['Ticker']}) - {pos['Account Type']} - £{pos['Value (GBP)']}")
 
 
 if __name__ == "__main__":

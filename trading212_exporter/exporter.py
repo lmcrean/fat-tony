@@ -30,43 +30,6 @@ class PortfolioExporter:
         self.positions: List[Position] = []
         self.account_summaries: Dict[str, AccountSummary] = {}
     
-    def _is_uk_etf_priced_in_pence(self, ticker: str, current_price: Decimal) -> bool:
-        """
-        Determine if a UK ETF is priced in pence (GBX) instead of pounds (GBP).
-        
-        Based on analysis of Trading 212 API data, certain UK ETFs return prices in pence
-        while others return prices in pounds. This function identifies which need conversion.
-        """
-        # Specific tickers confirmed to be priced in pence (from source of truth analysis)
-        known_pence_tickers = {
-            'IITU_EQ',   # iShares S&P 500 IT - price ~2827 should be ~£28.27
-            'INTLl_EQ',  # WisdomTree AI - price ~5557 should be ~£55.57
-            'SGLNl_EQ',  # iShares Physical Gold - price ~4910 should be ~£49.10
-            'CNX1_EQ',   # iShares NASDAQ 100 - price ~98520 should be ~£985.20
-            'VUAGl_EQ',  # Vanguard S&P 500 (Acc) - price ~8998 should be ~£89.98
-            'VGERl_EQ',  # Vanguard Germany All Cap - price ~2943 should be ~£29.43
-            'SMGBl_EQ',  # VanEck Semiconductor (Acc) - price ~3553 should be ~£35.53
-            'VWRPl_EQ',  # Vanguard FTSE All-World (Acc) - price ~11508 should be ~£115.08
-            'RBODl_EQ',  # iShares Automation & Robotics (Dist) - price ~995 should be ~£9.95
-            'IINDl_EQ',  # iShares MSCI India (Acc) - price ~713 should be ~£7.13
-            'FXACa_EQ',  # iShares China Large Cap (Acc) - price ~415 should be ~£4.15
-            'EXICd_EQ',  # iShares Core DAX DE (Dist) - price ~684 should be ~£6.84
-        }
-        
-        # US stocks should never be converted (they have _US_EQ suffix)
-        is_us_stock = '_US_EQ' in ticker
-        
-        # Only convert specific known pence tickers that are not US stocks
-        should_convert = not is_us_stock and ticker in known_pence_tickers
-        
-        if should_convert:
-            print(f"    Detected pence pricing for {ticker}: {current_price} -> {current_price/100}")
-        
-        return should_convert
-    
-    def _convert_pence_to_pounds(self, value: Decimal) -> Decimal:
-        """Convert a price from pence to pounds by dividing by 100."""
-        return value / Decimal('100')
     
     def fetch_data(self):
         """Fetch all necessary data from the API."""
@@ -110,17 +73,9 @@ class PortfolioExporter:
                 display_name = get_display_name(ticker, api_name)
                 print(f"  -> Using display name: {display_name}")
                 
-                # Get raw price data
-                raw_avg_price = Decimal(str(position_data['averagePrice']))
-                raw_current_price = Decimal(str(position_data['currentPrice']))
-                
-                # Check if this UK ETF is priced in pence and needs conversion
-                if self._is_uk_etf_priced_in_pence(ticker, raw_current_price):
-                    avg_price = self._convert_pence_to_pounds(raw_avg_price)
-                    current_price = self._convert_pence_to_pounds(raw_current_price)
-                else:
-                    avg_price = raw_avg_price
-                    current_price = raw_current_price
+                # Get raw price data (no conversion)
+                avg_price = Decimal(str(position_data['averagePrice']))
+                current_price = Decimal(str(position_data['currentPrice']))
                 
                 position = Position(
                     ticker=ticker,
@@ -194,6 +149,27 @@ class PortfolioExporter:
     def _format_profit_loss_csv(self, value: Decimal) -> str:
         """Format profit/loss for CSV (no color indicators)."""
         return f"{value.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP):+,.2f}"
+    
+    def _format_price_raw(self, value: Decimal) -> str:
+        """Format a price value without currency symbols for CSV."""
+        return f"{value.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP):.2f}"
+    
+    def _convert_to_gbp(self, value: Decimal, currency: str) -> Decimal:
+        """Convert currency value to GBP equivalent.
+        
+        For now, this implements basic conversion logic:
+        - GBP: return as-is
+        - GBX (pence): divide by 100
+        - USD, EUR: return as-is (TODO: add proper FX rates)
+        """
+        if currency == "GBP":
+            return value
+        elif currency == "GBX":
+            return value / Decimal('100')
+        else:
+            # For USD, EUR, etc. - return as-is for now
+            # TODO: Implement proper currency conversion using FX rates
+            return value
     
     def generate_markdown(self) -> str:
         """Generate the markdown output."""
@@ -328,48 +304,36 @@ class PortfolioExporter:
         return "\n".join(lines)
     
     def generate_positions_csv(self) -> List[List[str]]:
-        """Generate CSV data for positions only."""
+        """Generate CSV data for positions matching source_of_truth.gbp.csv format exactly."""
         csv_data = []
         
-        # Add header with timestamp
-        csv_data.append([f"Trading 212 Portfolio Positions - Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"])
-        csv_data.append([])  # Empty row
+        # Header matching source_of_truth.gbp.csv format exactly
+        csv_data.append(["Account Type", "Name", "Ticker", "Quantity of Shares", "Price owned Currency", "Current Price Currency", "Price Owned", "Price Owned (GBP)", "Current Price", "Current Price (GBP)", "Value (GBP)", "Change (GBP)", "Change %"])
         
-        # Check if we have multiple accounts
-        if len(self.clients) > 1:
-            # Multi-account view: include account column
-            csv_data.append(["ACCOUNT", "NAME", "SHARES", "AVERAGE_PRICE", "CURRENT_PRICE", "MARKET_VALUE", "RESULT", "RESULT_%", "CURRENCY"])
+        # Process all positions
+        for position in sorted(self.positions, key=lambda p: p.market_value, reverse=True):
+            # Map account names to match source_of_truth format
+            account_type = "ISA" if "ISA" in position.account_name else "Trading"
             
-            for account_name in self.clients.keys():
-                account_positions = [p for p in self.positions if p.account_name == account_name]
-                
-                for position in sorted(account_positions, key=lambda p: p.market_value, reverse=True):
-                    csv_data.append([
-                        account_name,
-                        position.name,
-                        f"{position.shares:,.4f}".rstrip('0').rstrip('.'),
-                        self._format_currency_csv(position.average_price),
-                        self._format_currency_csv(position.current_price),
-                        self._format_currency_csv(position.market_value),
-                        self._format_profit_loss_csv(position.profit_loss),
-                        self._format_percentage_csv(position.profit_loss_percent),
-                        position.currency
-                    ])
-        else:
-            # Single account view
-            csv_data.append(["NAME", "SHARES", "AVERAGE_PRICE", "CURRENT_PRICE", "MARKET_VALUE", "RESULT", "RESULT_%", "CURRENCY"])
+            # Calculate GBP equivalent prices using conversion logic
+            price_owned_gbp = self._convert_to_gbp(position.average_price, position.currency)
+            current_price_gbp = self._convert_to_gbp(position.current_price, position.currency)
             
-            for position in sorted(self.positions, key=lambda p: p.market_value, reverse=True):
-                csv_data.append([
-                    position.name,
-                    f"{position.shares:,.4f}".rstrip('0').rstrip('.'),
-                    self._format_currency_csv(position.average_price),
-                    self._format_currency_csv(position.current_price),
-                    self._format_currency_csv(position.market_value),
-                    self._format_profit_loss_csv(position.profit_loss),
-                    self._format_percentage_csv(position.profit_loss_percent),
-                    position.currency
-                ])
+            csv_data.append([
+                account_type,
+                position.name,
+                position.ticker,
+                f"{position.shares:,.4f}".rstrip('0').rstrip('.'),
+                position.currency,
+                position.currency,
+                self._format_price_raw(position.average_price),
+                self._format_price_raw(price_owned_gbp),
+                self._format_price_raw(position.current_price),
+                self._format_price_raw(current_price_gbp),
+                self._format_currency_csv(position.market_value),
+                self._format_profit_loss_csv(position.profit_loss),
+                f"{position.profit_loss_percent.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP):.2f}"
+            ])
         
         return csv_data
     
@@ -437,8 +401,14 @@ class PortfolioExporter:
         
         print(f"\nPortfolio exported successfully to {filename}")
     
-    def save_to_csv(self, positions_filename: str = "portfolio_positions.csv", summary_filename: str = "portfolio_summary.csv"):
+    def save_to_csv(self, positions_filename: str = "output/portfolio_positions.csv", summary_filename: str = "output/portfolio_summary.csv"):
         """Save the CSV output to separate files for positions and summary."""
+        import os
+        
+        # Ensure output directory exists
+        for filename in [positions_filename, summary_filename]:
+            os.makedirs(os.path.dirname(filename), exist_ok=True)
+        
         # Save positions CSV
         positions_data = self.generate_positions_csv()
         with open(positions_filename, 'w', newline='', encoding='utf-8') as f:
@@ -452,3 +422,179 @@ class PortfolioExporter:
             writer.writerows(summary_data)
         
         print(f"Portfolio exported successfully to {positions_filename} and {summary_filename}")
+    
+    def compare_with_source_of_truth(self, source_of_truth_path: str = "source_of_truth/source_of_truth.gbp.csv") -> Dict:
+        """Compare generated portfolio with source of truth data and return discrepancies."""
+        import os
+        
+        if not os.path.exists(source_of_truth_path):
+            print(f"Warning: Source of truth file not found at {source_of_truth_path}")
+            return {"error": "Source of truth file not found"}
+        
+        # Read source of truth data
+        source_data = {}
+        try:
+            with open(source_of_truth_path, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+                for row in reader:
+                    ticker = row.get('Ticker', '')
+                    if ticker:
+                        source_data[ticker] = row
+        except Exception as e:
+            return {"error": f"Failed to read source of truth: {e}"}
+        
+        # Generate our data for comparison
+        our_data = {}
+        for position in self.positions:
+            our_data[position.ticker] = position
+        
+        discrepancies = {
+            "missing_in_our_data": [],
+            "missing_in_source": [],
+            "price_differences": [],
+            "quantity_differences": [],
+            "value_differences": [],
+            "summary": {}
+        }
+        
+        # Find missing positions
+        source_tickers = set(source_data.keys())
+        our_tickers = set(our_data.keys())
+        
+        discrepancies["missing_in_our_data"] = list(source_tickers - our_tickers)
+        discrepancies["missing_in_source"] = list(our_tickers - source_tickers)
+        
+        # Compare matching positions
+        common_tickers = source_tickers & our_tickers
+        tolerance = Decimal('0.01')  # 1 cent tolerance
+        
+        for ticker in common_tickers:
+            source_pos = source_data[ticker]
+            our_pos = our_data[ticker]
+            
+            # Compare current prices
+            try:
+                source_current_price = Decimal(str(source_pos.get('Current Price (GBP)', '0')))
+                our_current_price_gbp = self._convert_to_gbp(our_pos.current_price, our_pos.currency)
+                
+                if abs(source_current_price - our_current_price_gbp) > tolerance:
+                    discrepancies["price_differences"].append({
+                        "ticker": ticker,
+                        "name": our_pos.name,
+                        "source_price": float(source_current_price),
+                        "our_price": float(our_current_price_gbp),
+                        "difference": float(source_current_price - our_current_price_gbp)
+                    })
+            except (ValueError, TypeError) as e:
+                print(f"Error comparing price for {ticker}: {e}")
+            
+            # Compare quantities
+            try:
+                source_quantity = Decimal(str(source_pos.get('Quantity of Shares', '0')))
+                our_quantity = our_pos.shares
+                
+                if abs(source_quantity - our_quantity) > Decimal('0.0001'):  # Small tolerance for rounding
+                    discrepancies["quantity_differences"].append({
+                        "ticker": ticker,
+                        "name": our_pos.name,
+                        "source_quantity": float(source_quantity),
+                        "our_quantity": float(our_quantity),
+                        "difference": float(source_quantity - our_quantity)
+                    })
+            except (ValueError, TypeError) as e:
+                print(f"Error comparing quantity for {ticker}: {e}")
+        
+        # Generate summary
+        discrepancies["summary"] = {
+            "total_source_positions": len(source_tickers),
+            "total_our_positions": len(our_tickers),
+            "common_positions": len(common_tickers),
+            "missing_positions": len(discrepancies["missing_in_our_data"]) + len(discrepancies["missing_in_source"]),
+            "price_discrepancies": len(discrepancies["price_differences"]),
+            "quantity_discrepancies": len(discrepancies["quantity_differences"])
+        }
+        
+        return discrepancies
+    
+    def generate_discrepancy_report(self, discrepancies: Dict, output_path: str = "output/discrepancy_report.md"):
+        """Generate a markdown report of discrepancies."""
+        import os
+        
+        # Ensure output directory exists
+        os.makedirs(os.path.dirname(output_path), exist_ok=True)
+        
+        lines = []
+        lines.append(f"# Portfolio Discrepancy Report")
+        lines.append(f"\n*Generated on {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*\n")
+        
+        if "error" in discrepancies:
+            lines.append(f"## Error\n\n{discrepancies['error']}")
+            with open(output_path, 'w', encoding='utf-8') as f:
+                f.write("\n".join(lines))
+            return
+        
+        # Summary
+        summary = discrepancies["summary"]
+        lines.append("## Summary\n")
+        lines.append(f"- **Source of Truth Positions**: {summary['total_source_positions']}")
+        lines.append(f"- **Our Positions**: {summary['total_our_positions']}")
+        lines.append(f"- **Common Positions**: {summary['common_positions']}")
+        lines.append(f"- **Missing Positions**: {summary['missing_positions']}")
+        lines.append(f"- **Price Discrepancies**: {summary['price_discrepancies']}")
+        lines.append(f"- **Quantity Discrepancies**: {summary['quantity_discrepancies']}")
+        lines.append("")
+        
+        # Missing positions
+        if discrepancies["missing_in_our_data"]:
+            lines.append("## Positions Missing in Our Data\n")
+            for ticker in discrepancies["missing_in_our_data"]:
+                lines.append(f"- {ticker}")
+            lines.append("")
+        
+        if discrepancies["missing_in_source"]:
+            lines.append("## Positions Missing in Source of Truth\n")
+            for ticker in discrepancies["missing_in_source"]:
+                lines.append(f"- {ticker}")
+            lines.append("")
+        
+        # Price differences
+        if discrepancies["price_differences"]:
+            lines.append("## Price Discrepancies\n")
+            lines.append("| Ticker | Name | Source Price (GBP) | Our Price (GBP) | Difference |")
+            lines.append("|--------|------|-------------------|-----------------|------------|")
+            
+            for diff in discrepancies["price_differences"]:
+                lines.append(f"| {diff['ticker']} | {diff['name']} | {diff['source_price']:.2f} | {diff['our_price']:.2f} | {diff['difference']:+.2f} |")
+            lines.append("")
+        
+        # Quantity differences
+        if discrepancies["quantity_differences"]:
+            lines.append("## Quantity Discrepancies\n")
+            lines.append("| Ticker | Name | Source Quantity | Our Quantity | Difference |")
+            lines.append("|--------|------|-----------------|--------------|------------|")
+            
+            for diff in discrepancies["quantity_differences"]:
+                lines.append(f"| {diff['ticker']} | {diff['name']} | {diff['source_quantity']:.4f} | {diff['our_quantity']:.4f} | {diff['difference']:+.4f} |")
+            lines.append("")
+        
+        # Write to file
+        with open(output_path, 'w', encoding='utf-8') as f:
+            f.write("\n".join(lines))
+        
+        print(f"Discrepancy report saved to {output_path}")
+        return output_path
+    
+    def export_with_comparison(self, source_of_truth_path: str = "source_of_truth/source_of_truth.gbp.csv"):
+        """Export CSV and generate discrepancy report in one step."""
+        # Export CSV files
+        self.save_to_csv()
+        
+        # Compare with source of truth and generate report
+        discrepancies = self.compare_with_source_of_truth(source_of_truth_path)
+        report_path = self.generate_discrepancy_report(discrepancies)
+        
+        return {
+            "csv_exported": True,
+            "discrepancy_report": report_path,
+            "discrepancies": discrepancies
+        }

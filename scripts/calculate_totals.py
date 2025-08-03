@@ -52,44 +52,73 @@ def calculate_totals(csv_path):
     return totals, grand_total
 
 
-def write_totals_csv(totals, grand_total, output_path):
-    """Write the calculated totals to a CSV file."""
+def write_totals_csv(totals, grand_total, output_path, cash_gbp=7128.00):
+    """Write the calculated totals to a CSV file in the exact format."""
+    
+    # Calculate cash/portfolio percentages
+    total_with_cash = grand_total['value'] + cash_gbp
+    cash_pct = (cash_gbp / total_with_cash * 100)
+    portfolio_pct = (grand_total['value'] / total_with_cash * 100)
+    
     with open(output_path, 'w', newline='', encoding='utf-8') as f:
-        fieldnames = ['Account Type', 'Value GBP', 'Change GBP', 'Change %']
-        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer = csv.writer(f)
         
-        writer.writeheader()
+        # Header
+        writer.writerow(['Account Type', 'Value GBP', 'Change GBP', 'Change %'])
         
         # Write Trading Account totals
-        writer.writerow({
-            'Account Type': 'Trading Acc value GBP',
-            'Value GBP': f"{totals['Trading']['value']:.2f}",
-            'Change GBP': f"{totals['Trading']['change']:.2f}",
-            'Change %': f"{totals['Trading']['change_pct']:.2f}"
-        })
+        writer.writerow([
+            'Trading Acc value GBP',
+            f"{totals['Trading']['value']:.2f}",
+            f"{totals['Trading']['change']:.2f}",
+            f"{totals['Trading']['change_pct']:.2f}"
+        ])
         
         # Write ISA Account totals
-        writer.writerow({
-            'Account Type': 'ISA value GBP',
-            'Value GBP': f"{totals['ISA']['value']:.2f}",
-            'Change GBP': f"{totals['ISA']['change']:.2f}",
-            'Change %': f"{totals['ISA']['change_pct']:.2f}"
-        })
+        writer.writerow([
+            'ISA value GBP',
+            f"{totals['ISA']['value']:.2f}",
+            f"{totals['ISA']['change']:.2f}",
+            f"{totals['ISA']['change_pct']:.2f}"
+        ])
         
-        # Write Grand Total
-        writer.writerow({
-            'Account Type': 'Grand Total value GBP',
-            'Value GBP': f"{grand_total['value']:.2f}",
-            'Change GBP': f"{grand_total['change']:.2f}",
-            'Change %': f"{grand_total['change_pct']:.2f}"
-        })
+        # Write Grand Total Portfolio
+        writer.writerow([
+            'Grand Total Portfolio value GBP',
+            f"{grand_total['value']:.2f}",
+            f"{grand_total['change']:.2f}",
+            f"{grand_total['change_pct']:.2f}"
+        ])
+        
+        # Write Cash
+        writer.writerow([
+            'Grand Total cash GBP',
+            f' {cash_gbp:.0f}',
+            ' -',
+            '-'
+        ])
+        
+        # Write Total with cash
+        writer.writerow([
+            'Grand Total cash+portfolio value GVP',
+            f' {total_with_cash:.0f}',
+            '-',
+            '-'
+        ])
+        
+        # Separator
+        writer.writerow(['--', '--', '--', '--'])
+        
+        # Percentages
+        writer.writerow([f'% cash', f'{cash_pct:.2f}%', '', ''])
+        writer.writerow([f'% portfolio', f'{portfolio_pct:.2f}%', '', ''])
 
 
 def main():
     """Main function to calculate and write totals."""
     # Define paths
     project_root = Path(__file__).parent.parent
-    input_path = project_root / 'source_of_truth' / 'source_of_truth.csv'
+    input_path = project_root / 'source_of_truth' / 'source_of_truth.gbp.csv'
     output_path = project_root / 'source_of_truth' / 'totals_calc.csv'
     
     print(f"Reading from: {input_path}")
