@@ -33,11 +33,16 @@ def spot_check_client(source_of_truth_data):
     # Create positions for our target tickers
     positions_data = []
     for ticker_data in source_of_truth_data["target_tickers"]:
+        # Convert from expected pounds values back to API pence values
+        # The API returns prices in pence, which get converted to pounds by the exporter
+        api_avg_price = ticker_data["average_price_numeric"] * 100  # £28.27 -> 2827.0 pence
+        api_current_price = ticker_data["current_price_numeric"] * 100  # £28.27 -> 2827.0 pence
+        
         positions_data.append({
             "ticker": ticker_data["ticker"],
             "quantity": ticker_data["shares"],
-            "averagePrice": ticker_data["average_price_numeric"],
-            "currentPrice": ticker_data["current_price_numeric"],
+            "averagePrice": api_avg_price,
+            "currentPrice": api_current_price,
             "ppl": ticker_data["profit_loss_numeric"],
             "fxPpl": 0.0,
             "pieQuantity": 0.0

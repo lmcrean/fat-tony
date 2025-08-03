@@ -43,6 +43,14 @@ class PortfolioExporter:
             'INTLl_EQ',  # WisdomTree AI - price ~5557 should be ~£55.57
             'SGLNl_EQ',  # iShares Physical Gold - price ~4910 should be ~£49.10
             'CNX1_EQ',   # iShares NASDAQ 100 - price ~98520 should be ~£985.20
+            'VUAGl_EQ',  # Vanguard S&P 500 (Acc) - price ~8998 should be ~£89.98
+            'VGERl_EQ',  # Vanguard Germany All Cap - price ~2943 should be ~£29.43
+            'SMGBl_EQ',  # VanEck Semiconductor (Acc) - price ~3553 should be ~£35.53
+            'VWRPl_EQ',  # Vanguard FTSE All-World (Acc) - price ~11508 should be ~£115.08
+            'RBODl_EQ',  # iShares Automation & Robotics (Dist) - price ~995 should be ~£9.95
+            'IINDl_EQ',  # iShares MSCI India (Acc) - price ~713 should be ~£7.13
+            'FXACa_EQ',  # iShares China Large Cap (Acc) - price ~415 should be ~£4.15
+            'EXICd_EQ',  # iShares Core DAX DE (Dist) - price ~684 should be ~£6.84
         }
         
         # US stocks should never be converted (they have _US_EQ suffix)

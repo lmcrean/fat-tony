@@ -37,7 +37,9 @@ def test_price_fix():
         ("CNX1_EQ", Decimal("98520.0")),     # Should convert
         ("RMVl_EQ", Decimal("812.2")),       # Should NOT convert (< 1000)
         ("GOOGL_US_EQ", Decimal("188.73")),  # Should NOT convert (US stock)
-        ("VUAGl_EQ", Decimal("89.98")),      # Should NOT convert (< 1000)
+        ("VUAGl_EQ", Decimal("8998.0")),     # Should convert (in pence)
+        ("VGERl_EQ", Decimal("2943.0")),     # Should convert (in pence)
+        ("SMGBl_EQ", Decimal("3553.0")),     # Should convert (in pence)
     ]
     
     for ticker, price in test_cases:
