@@ -442,7 +442,7 @@ class PortfolioExporter:
         
         print(f"\nPortfolio exported successfully to {filename}")
     
-    def save_to_csv(self, positions_filename: str = "output/portfolio_positions.csv", summary_filename: str = "output/portfolio_summary.csv"):
+    def save_to_csv(self, positions_filename: str = "output/portfolio_positions_FINAL.csv", summary_filename: str = "output/portfolio_summary.csv"):
         """Save the CSV output to separate files for positions and summary."""
         import os
         
