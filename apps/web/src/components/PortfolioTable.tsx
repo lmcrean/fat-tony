@@ -1,0 +1,200 @@
+import { useState, useMemo } from 'react';
+import { Position } from '../types/portfolio';
+
+interface Props {
+  positions: Position[];
+  accountFilter?: string;
+}
+
+type SortKey = keyof Position | null;
+type SortDirection = 'asc' | 'desc';
+
+export default function PortfolioTable({ positions, accountFilter }: Props) {
+  const [sortKey, setSortKey] = useState<SortKey>('valueGBP');
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+
+  const filteredPositions = useMemo(() => {
+    let filtered = positions;
+    if (accountFilter && accountFilter !== 'All') {
+      filtered = positions.filter(p =>
+        accountFilter === 'ISA' ? p.accountType === 'ISA' : p.accountType === 'Trading'
+      );
+    }
+    return filtered;
+  }, [positions, accountFilter]);
+
+  const sortedPositions = useMemo(() => {
+    if (!sortKey) return filteredPositions;
+
+    return [...filteredPositions].sort((a, b) => {
+      const aVal = a[sortKey];
+      const bVal = b[sortKey];
+
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
+      }
+
+      if (typeof aVal === 'string' && typeof bVal === 'string') {
+        return sortDirection === 'asc'
+          ? aVal.localeCompare(bVal)
+          : bVal.localeCompare(aVal);
+      }
+
+      return 0;
+    });
+  }, [filteredPositions, sortKey, sortDirection]);
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortKey(key);
+      setSortDirection('desc');
+    }
+  };
+
+  const formatCurrency = (value: number) => {
+    return new Intl.NumberFormat('en-GB', {
+      style: 'currency',
+      currency: 'GBP',
+      minimumFractionDigits: 2,
+    }).format(value);
+  };
+
+  const formatPercent = (value: number) => {
+    const sign = value >= 0 ? '+' : '';
+    return `${sign}${value.toFixed(2)}%`;
+  };
+
+  const formatNumber = (value: number, decimals = 2) => {
+    return value.toLocaleString('en-GB', {
+      minimumFractionDigits: decimals,
+      maximumFractionDigits: decimals,
+    });
+  };
+
+  const SortIcon = ({ column }: { column: SortKey }) => {
+    if (sortKey !== column) return <span className="text-portfolio-text-dim opacity-30">▼</span>;
+    return (
+      <span className="text-blue-400">
+        {sortDirection === 'asc' ? '▲' : '▼'}
+      </span>
+    );
+  };
+
+  return (
+    <div className="w-full overflow-x-auto">
+      <table className="w-full border-collapse">
+        <thead>
+          <tr className="border-b border-portfolio-border">
+            <th
+              className="text-left py-4 px-4 text-portfolio-text-dim text-xs font-medium uppercase cursor-pointer hover:text-portfolio-text transition-colors"
+              onClick={() => handleSort('name')}
+            >
+              <div className="flex items-center gap-2">
+                NAME <SortIcon column="name" />
+              </div>
+            </th>
+            <th
+              className="text-right py-4 px-4 text-portfolio-text-dim text-xs font-medium uppercase cursor-pointer hover:text-portfolio-text transition-colors"
+              onClick={() => handleSort('quantity')}
+            >
+              <div className="flex items-center justify-end gap-2">
+                SHARES <SortIcon column="quantity" />
+              </div>
+            </th>
+            <th
+              className="text-right py-4 px-4 text-portfolio-text-dim text-xs font-medium uppercase cursor-pointer hover:text-portfolio-text transition-colors"
+              onClick={() => handleSort('valueGBP')}
+            >
+              <div className="flex items-center justify-end gap-2">
+                MARKET VALUE <SortIcon column="valueGBP" />
+              </div>
+            </th>
+            <th
+              className="text-right py-4 px-4 text-portfolio-text-dim text-xs font-medium uppercase cursor-pointer hover:text-portfolio-text transition-colors"
+              onClick={() => handleSort('priceOwnedGBP')}
+            >
+              <div className="flex items-center justify-end gap-2">
+                AVERAGE PRICE <SortIcon column="priceOwnedGBP" />
+              </div>
+            </th>
+            <th
+              className="text-right py-4 px-4 text-portfolio-text-dim text-xs font-medium uppercase cursor-pointer hover:text-portfolio-text transition-colors"
+              onClick={() => handleSort('currentPriceGBP')}
+            >
+              <div className="flex items-center justify-end gap-2">
+                CURRENT PRICE <SortIcon column="currentPriceGBP" />
+              </div>
+            </th>
+            <th
+              className="text-right py-4 px-4 text-portfolio-text-dim text-xs font-medium uppercase cursor-pointer hover:text-portfolio-text transition-colors"
+              onClick={() => handleSort('changeGBP')}
+            >
+              <div className="flex items-center justify-end gap-2">
+                RESULT <SortIcon column="changeGBP" />
+              </div>
+            </th>
+            <th
+              className="text-right py-4 px-4 text-portfolio-text-dim text-xs font-medium uppercase cursor-pointer hover:text-portfolio-text transition-colors"
+              onClick={() => handleSort('changePercent')}
+            >
+              <div className="flex items-center justify-end gap-2">
+                RESULT % <SortIcon column="changePercent" />
+              </div>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {sortedPositions.map((position, index) => (
+            <tr
+              key={`${position.ticker}-${index}`}
+              className="border-b border-portfolio-border hover:bg-portfolio-card/50 transition-colors"
+            >
+              <td className="py-4 px-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-portfolio-card flex items-center justify-center text-xs font-bold">
+                    {position.name.substring(0, 2).toUpperCase()}
+                  </div>
+                  <div>
+                    <div className="text-portfolio-text font-medium">{position.name}</div>
+                    <div className="text-portfolio-text-dim text-xs">{position.ticker}</div>
+                  </div>
+                </div>
+              </td>
+              <td className="py-4 px-4 text-right text-portfolio-text">
+                {formatNumber(position.quantity, 3)}
+              </td>
+              <td className="py-4 px-4 text-right text-portfolio-text font-medium">
+                {formatCurrency(position.valueGBP)}
+              </td>
+              <td className="py-4 px-4 text-right text-portfolio-text-dim">
+                {position.priceOwnedCurrency === 'GBX' ? 'p' : '$'}
+                {formatNumber(position.priceOwned)}
+              </td>
+              <td className="py-4 px-4 text-right text-portfolio-text">
+                <div className="flex items-center justify-end gap-1">
+                  {position.currentPriceCurrency === 'GBX' ? 'p' : '$'}
+                  {formatNumber(position.currentPrice)}
+                  <span className={position.changeGBP >= 0 ? 'text-portfolio-green' : 'text-portfolio-red'}>
+                    {position.changeGBP >= 0 ? '▲' : '▼'}
+                  </span>
+                </div>
+              </td>
+              <td className={`py-4 px-4 text-right font-medium ${
+                position.changeGBP >= 0 ? 'text-portfolio-green' : 'text-portfolio-red'
+              }`}>
+                {position.changeGBP >= 0 ? '+' : ''}{formatCurrency(position.changeGBP)}
+              </td>
+              <td className={`py-4 px-4 text-right font-medium ${
+                position.changePercent >= 0 ? 'text-portfolio-green' : 'text-portfolio-red'
+              }`}>
+                {formatPercent(position.changePercent)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
