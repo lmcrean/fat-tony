@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import PortfolioTable from './components/PortfolioTable';
 import AccountSummary from './components/AccountSummary';
 import AccountFilter from './components/AccountFilter';
-import { PortfolioData } from './types/portfolio';
+import type { PortfolioData } from './types/portfolio';
 import { parsePositionsCSV, parseSummaryCSV } from './utils/csvParser';
 
 function App() {

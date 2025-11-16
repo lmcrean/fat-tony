@@ -1,4 +1,4 @@
-import { AccountSummary as AccountSummaryType } from '../types/portfolio';
+import type { AccountSummary as AccountSummaryType } from '../types/portfolio';
 
 interface Props {
   totalFreeFunds: number;

@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Position } from '../types/portfolio';
+import type { Position } from '../types/portfolio';
 
 interface Props {
   positions: Position[];

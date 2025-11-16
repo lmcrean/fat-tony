@@ -1,4 +1,4 @@
-import { Position, AccountSummary, PortfolioData } from '../types/portfolio';
+import type { Position, AccountSummary, PortfolioData } from '../types/portfolio';
 
 export function parseNumber(value: string): number {
   // Remove quotes, commas, and + signs
