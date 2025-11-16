@@ -10,13 +10,15 @@
  * - "RMVl_EQ" -> "RMV"
  */
 export function extractBaseTicker(ticker: string): string {
-  // Remove common suffixes
-  const cleaned = ticker.replace(/_US_EQ$/i, '')
-    .replace(/_EQ$/i, '')
-    .replace(/l_EQ$/i, '')
-    .replace(/a_EQ$/i, '')
-    .replace(/d_EQ$/i, '');
-  
+  // Remove Trading 212 suffixes more thoroughly:
+  // - Share class letters (l, a, d, p) with _US_EQ or _EQ
+  // - Standalone _US_EQ, _US, or _EQ patterns
+  const cleaned = ticker
+    .replace(/[ladp]?_US_EQ$/i, '')  // Optional letter + _US_EQ (e.g., NVDA_US_EQ, TICKERl_US_EQ)
+    .replace(/[ladp]?_EQ$/i, '')      // Optional letter + _EQ (e.g., VUAGl_EQ, VUSA_EQ)
+    .replace(/_US$/i, '')              // Standalone _US
+    .replace(/_+$/, '');               // Clean any trailing underscores
+
   return cleaned;
 }
 

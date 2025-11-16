@@ -101,13 +101,24 @@ class PortfolioExporter:
             
             # Calculate summary for this account
             account_positions = [p for p in self.positions if p.account_name == account_name]
-            total_invested = sum(p.cost_basis for p in account_positions)
-            total_value = sum(p.market_value for p in account_positions)
-            total_result = total_value - total_invested
+
+            # Convert all positions to GBP before summing to avoid mixing currencies
+            total_invested_gbp = Decimal('0')
+            total_value_gbp = Decimal('0')
+
+            for p in account_positions:
+                # Convert prices to GBP
+                cost_basis_gbp = self._convert_to_gbp(p.average_price, p.currency, p.ticker) * p.shares
+                market_value_gbp = self._convert_to_gbp(p.current_price, p.currency, p.ticker) * p.shares
+
+                total_invested_gbp += cost_basis_gbp
+                total_value_gbp += market_value_gbp
+
+            total_result = total_value_gbp - total_invested_gbp
             
             self.account_summaries[account_name] = AccountSummary(
                 free_funds=free_funds,
-                invested=Decimal(str(total_value)),
+                invested=Decimal(str(total_value_gbp)),
                 result=Decimal(str(total_result)),
                 currency=account_currency,
                 account_name=account_name
@@ -618,6 +629,7 @@ class PortfolioExporter:
     def save_history_to_csv(self, buy_filename: str = "output/buy_history.csv", sell_filename: str = "output/sell_history.csv"):
         """Save buy and sell history to separate CSV files."""
         import os
+        import shutil
 
         # Ensure output directory exists
         for filename in [buy_filename, sell_filename]:
@@ -639,6 +651,19 @@ class PortfolioExporter:
 
         print(f"✓ Sell history exported to {sell_filename}")
 
+        # Also copy to web app public directory for local development
+        web_app_output_dir = "apps/web/public/output"
+        if os.path.exists("apps/web"):
+            os.makedirs(web_app_output_dir, exist_ok=True)
+
+            web_buy_path = os.path.join(web_app_output_dir, "buy_history.csv")
+            web_sell_path = os.path.join(web_app_output_dir, "sell_history.csv")
+
+            shutil.copy2(buy_filename, web_buy_path)
+            shutil.copy2(sell_filename, web_sell_path)
+
+            print(f"✓ Also copied to web app: {web_buy_path} and {web_sell_path}")
+
     def save_to_file(self, filename: str = "portfolio.md"):
         """Save the markdown output to a file."""
         markdown_content = self.generate_markdown()
@@ -651,24 +676,38 @@ class PortfolioExporter:
     def save_to_csv(self, positions_filename: str = "output/portfolio_positions_FINAL.csv", summary_filename: str = "output/portfolio_summary.csv"):
         """Save the CSV output to separate files for positions and summary."""
         import os
-        
+        import shutil
+
         # Ensure output directory exists
         for filename in [positions_filename, summary_filename]:
             os.makedirs(os.path.dirname(filename), exist_ok=True)
-        
+
         # Save positions CSV
         positions_data = self.generate_positions_csv()
         with open(positions_filename, 'w', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
             writer.writerows(positions_data)
-        
+
         # Save summary CSV
         summary_data = self.generate_summary_csv()
         with open(summary_filename, 'w', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
             writer.writerows(summary_data)
-        
+
         print(f"Portfolio exported successfully to {positions_filename} and {summary_filename}")
+
+        # Also copy to web app public directory for local development
+        web_app_output_dir = "apps/web/public/output"
+        if os.path.exists("apps/web"):
+            os.makedirs(web_app_output_dir, exist_ok=True)
+
+            web_positions_path = os.path.join(web_app_output_dir, "portfolio_positions_FINAL.csv")
+            web_summary_path = os.path.join(web_app_output_dir, "portfolio_summary.csv")
+
+            shutil.copy2(positions_filename, web_positions_path)
+            shutil.copy2(summary_filename, web_summary_path)
+
+            print(f"Also copied to web app: {web_positions_path} and {web_summary_path}")
     
     def compare_with_source_of_truth(self, source_of_truth_path: str = "source_of_truth/source_of_truth.gbp.csv") -> Dict:
         """Compare generated portfolio with source of truth data and return discrepancies."""
