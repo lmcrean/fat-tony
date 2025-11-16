@@ -50,6 +50,7 @@ TICKER_TO_NAME = {
     "AMZN_US_EQ": "Amazon",
     "PGR_US_EQ": "Progressive",
     "ISRG_US_EQ": "Intuitive Surgical",
+    "YNDX_US_EQ": "Nebius Group NV",  # Formerly Yandex N.V., restructured in 2024
     
     # Special case for Figma (private company)
     "FIGMA": "Figma",

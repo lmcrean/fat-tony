@@ -6,6 +6,7 @@ import csv
 from typing import List, Optional, Dict
 from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
+import requests
 
 from tabulate import tabulate
 
@@ -31,12 +32,69 @@ class PortfolioExporter:
         self.account_summaries: Dict[str, AccountSummary] = {}
         self.buy_history: List[OrderHistory] = []
         self.sell_history: List[OrderHistory] = []
-    
-    
+
+        # Exchange rates (will be fetched from API or use defaults)
+        self.usd_to_gbp_rate: Decimal = Decimal('0.79')  # Fallback rate
+        self.eur_to_gbp_rate: Decimal = Decimal('0.86')  # Fallback rate
+        self.rates_source: str = "fallback"  # Track where rates came from
+
+    def _fetch_live_exchange_rates(self):
+        """Fetch live exchange rates from multiple sources with fallback.
+
+        Uses GBP as base currency to get USD and EUR rates.
+        Tries multiple free APIs before falling back to hardcoded rates.
+        """
+        # List of free exchange rate APIs to try (in order)
+        api_endpoints = [
+            "https://api.exchangerate.host/latest?base=GBP",
+            "https://open.er-api.com/v6/latest/GBP",
+            "https://api.exchangerate-api.io/v4/latest/GBP",
+        ]
+
+        for url in api_endpoints:
+            try:
+                print(f"Fetching live exchange rates from {url.split('/')[2]}...")
+                response = requests.get(url, timeout=5)
+                response.raise_for_status()
+
+                data = response.json()
+
+                # Handle different API response formats
+                rates = data.get('rates') or data.get('conversion_rates')
+
+                if rates and 'USD' in rates and 'EUR' in rates:
+                    # The API returns rates FROM GBP (e.g., 1 GBP = X USD)
+                    # We need the inverse (1 USD = Y GBP)
+                    gbp_to_usd = Decimal(str(rates.get('USD', 1.27)))
+                    gbp_to_eur = Decimal(str(rates.get('EUR', 1.16)))
+
+                    # Calculate inverse rates
+                    self.usd_to_gbp_rate = Decimal('1') / gbp_to_usd
+                    self.eur_to_gbp_rate = Decimal('1') / gbp_to_eur
+                    self.rates_source = "live_api"
+
+                    print(f"Live rates fetched successfully:")
+                    print(f"  USD -> GBP: {self.usd_to_gbp_rate:.4f}")
+                    print(f"  EUR -> GBP: {self.eur_to_gbp_rate:.4f}")
+                    print(f"  (1 GBP = ${gbp_to_usd:.4f} USD, {gbp_to_eur:.4f} EUR)")
+                    return  # Success - exit the function
+
+            except Exception as e:
+                print(f"  Failed: {type(e).__name__}")
+                continue  # Try next API
+
+        # If all APIs failed, use fallback
+        print(f"Warning: Could not fetch live exchange rates from any source")
+        print(f"  Using fallback rates: USD={self.usd_to_gbp_rate}, EUR={self.eur_to_gbp_rate}")
+        self.rates_source = "fallback"
+
     def fetch_data(self):
         """Fetch all necessary data from the API."""
-        print("Fetching portfolio data from all accounts...")
-        
+        # Fetch live exchange rates first
+        self._fetch_live_exchange_rates()
+
+        print("\nFetching portfolio data from all accounts...")
+
         for account_name, client in self.clients.items():
             print(f"\n--- Fetching data for {account_name} ---")
             
@@ -198,28 +256,27 @@ class PortfolioExporter:
     
     def _convert_to_gbp(self, value: Decimal, currency: str, ticker: str = "") -> Decimal:
         """Convert currency value to GBP equivalent.
-        
-        Uses realistic conversion rates based on typical exchange rates:
+
+        Uses live exchange rates fetched from API or fallback rates:
         - GBP: return as-is
-        - GBX (pence): divide by 100
-        - USD: multiply by ~0.79 (typical USD/GBP rate)
-        - EUR: multiply by ~0.86 (typical EUR/GBP rate)
+        - GBX (pence): divide by 100 (fixed conversion)
+        - USD: multiply by live USD→GBP rate
+        - EUR: multiply by live EUR→GBP rate
         """
         # Detect actual currency if needed
         actual_currency = self._detect_actual_currency(ticker, value, currency)
-        
+
         if actual_currency == "GBP":
             return value
         elif actual_currency == "GBX":
+            # GBX to GBP is a fixed conversion (100 pence = 1 pound)
             return value / Decimal('100')
         elif actual_currency == "USD":
-            # Approximate USD to GBP conversion (varies over time)
-            # Using a realistic rate around 0.79
-            return value * Decimal('0.79')
+            # Use live or fallback USD to GBP rate
+            return value * self.usd_to_gbp_rate
         elif actual_currency == "EUR":
-            # Approximate EUR to GBP conversion
-            # Using a realistic rate around 0.86
-            return value * Decimal('0.86')
+            # Use live or fallback EUR to GBP rate
+            return value * self.eur_to_gbp_rate
         else:
             # For other currencies, assume GBP equivalent
             return value

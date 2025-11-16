@@ -108,7 +108,7 @@ export default function PortfolioTable({ positions, accountFilter }: Props) {
               onClick={() => handleSort('accountType')}
             >
               <div className="flex items-center gap-2">
-                ACCOUNT <SortIcon column="accountType" />
+                <SortIcon column="accountType" />
               </div>
             </th>
             <th
@@ -210,14 +210,11 @@ export default function PortfolioTable({ positions, accountFilter }: Props) {
                 {getCurrencySymbol(position.priceOwnedCurrency)}
                 {formatNumber(position.priceOwned)}
               </td>
-              <td className="py-4 px-4 text-right text-portfolio-text">
-                <div className="flex items-center justify-end gap-1">
-                  {getCurrencySymbol(position.currentPriceCurrency)}
-                  {formatNumber(position.currentPrice)}
-                  <span className={position.changeGBP >= 0 ? 'text-portfolio-green' : 'text-portfolio-red'}>
-                    {position.changeGBP >= 0 ? '▲' : '▼'}
-                  </span>
-                </div>
+              <td className={`py-4 px-4 text-right ${
+                position.changeGBP >= 0 ? 'text-portfolio-green' : 'text-portfolio-red'
+              }`}>
+                {getCurrencySymbol(position.currentPriceCurrency)}
+                {formatNumber(position.currentPrice)}
               </td>
               <td className={`py-4 px-4 text-right font-medium ${
                 position.changeGBP >= 0 ? 'text-portfolio-green' : 'text-portfolio-red'
