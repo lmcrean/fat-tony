@@ -75,3 +75,38 @@ class Trading212Client:
     def get_account_metadata(self) -> Dict:
         """Get account metadata including currency."""
         return self._make_request("/equity/account/info")
+
+    def get_order_history(self, limit: int = 50, cursor: int = 0) -> List[Dict]:
+        """
+        Get historical orders.
+
+        Args:
+            limit: Maximum number of orders to fetch (default 50)
+            cursor: Pagination cursor for fetching more results
+
+        Returns:
+            List of historical order records
+
+        Note:
+            This endpoint has a rate limit of 1 request per 5 seconds.
+        """
+        # Adjust rate limit for this specific endpoint
+        time.sleep(5)  # Trading 212 order history has stricter rate limit
+
+        params = {
+            "limit": limit,
+            "cursor": cursor
+        }
+
+        try:
+            response = self._make_request("/equity/history/orders", params=params)
+            # The API may return a dict with 'items' or a list directly
+            if isinstance(response, dict) and 'items' in response:
+                return response['items']
+            elif isinstance(response, list):
+                return response
+            else:
+                return []
+        except Exception as e:
+            print(f"Error fetching order history: {e}")
+            return []

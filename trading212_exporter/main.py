@@ -53,16 +53,23 @@ def main():
     try:
         # Initialize exporter with all clients
         exporter = PortfolioExporter(clients)
-        
+
         # Fetch data from all accounts
         exporter.fetch_data()
-        
+
+        # Fetch order history (buy/sell transactions)
+        print("\n" + "="*60)
+        print("Fetching transaction history...")
+        print("="*60)
+        exporter.fetch_order_history()
+
         # Export based on format choice
         if args.format in ['markdown', 'both']:
             exporter.save_to_file()
-        
+
         if args.format in ['csv', 'both']:
             exporter.save_to_csv()
+            exporter.save_history_to_csv()
         
     except KeyboardInterrupt:
         print("\nExport cancelled by user")

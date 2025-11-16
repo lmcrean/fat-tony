@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import type { Position } from '../types/portfolio';
+import Logo from './Logo';
 
 interface Props {
   positions: Position[];
@@ -73,6 +74,21 @@ export default function PortfolioTable({ positions, accountFilter }: Props) {
     });
   };
 
+  const getCurrencySymbol = (currency: string) => {
+    switch (currency) {
+      case 'GBX':
+        return 'p';
+      case 'USD':
+        return '$';
+      case 'EUR':
+        return '€';
+      case 'GBP':
+        return '£';
+      default:
+        return currency;
+    }
+  };
+
   const SortIcon = ({ column }: { column: SortKey }) => {
     if (sortKey !== column) return <span className="text-portfolio-text-dim opacity-30">▼</span>;
     return (
@@ -87,6 +103,14 @@ export default function PortfolioTable({ positions, accountFilter }: Props) {
       <table className="w-full border-collapse">
         <thead>
           <tr className="border-b border-portfolio-border">
+            <th
+              className="text-left py-4 px-4 text-portfolio-text-dim text-xs font-medium uppercase cursor-pointer hover:text-portfolio-text transition-colors"
+              onClick={() => handleSort('accountType')}
+            >
+              <div className="flex items-center gap-2">
+                ACCOUNT <SortIcon column="accountType" />
+              </div>
+            </th>
             <th
               className="text-left py-4 px-4 text-portfolio-text-dim text-xs font-medium uppercase cursor-pointer hover:text-portfolio-text transition-colors"
               onClick={() => handleSort('name')}
@@ -152,10 +176,24 @@ export default function PortfolioTable({ positions, accountFilter }: Props) {
               className="border-b border-portfolio-border hover:bg-portfolio-card/50 transition-colors"
             >
               <td className="py-4 px-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-portfolio-card flex items-center justify-center text-xs font-bold">
-                    {position.name.substring(0, 2).toUpperCase()}
+                <div className="flex items-center gap-2">
+                  <div 
+                    className={`w-4 h-4 rounded ${
+                      position.accountType === 'ISA'
+                        ? 'bg-blue-500'
+                        : 'bg-purple-500'
+                    } relative group cursor-help`}
+                    title={position.accountType === 'ISA' ? 'ISA Account' : 'Trading Account'}
+                  >
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-portfolio-card border border-portfolio-border rounded text-xs text-portfolio-text whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
+                      {position.accountType === 'ISA' ? 'ISA Account' : 'Trading Account'}
+                    </div>
                   </div>
+                </div>
+              </td>
+              <td className="py-4 px-4">
+                <div className="flex items-center gap-3">
+                  <Logo ticker={position.ticker} name={position.name} size={32} />
                   <div>
                     <div className="text-portfolio-text font-medium">{position.name}</div>
                     <div className="text-portfolio-text-dim text-xs">{position.ticker}</div>
@@ -169,12 +207,12 @@ export default function PortfolioTable({ positions, accountFilter }: Props) {
                 {formatCurrency(position.valueGBP)}
               </td>
               <td className="py-4 px-4 text-right text-portfolio-text-dim">
-                {position.priceOwnedCurrency === 'GBX' ? 'p' : '$'}
+                {getCurrencySymbol(position.priceOwnedCurrency)}
                 {formatNumber(position.priceOwned)}
               </td>
               <td className="py-4 px-4 text-right text-portfolio-text">
                 <div className="flex items-center justify-end gap-1">
-                  {position.currentPriceCurrency === 'GBX' ? 'p' : '$'}
+                  {getCurrencySymbol(position.currentPriceCurrency)}
                   {formatNumber(position.currentPrice)}
                   <span className={position.changeGBP >= 0 ? 'text-portfolio-green' : 'text-portfolio-red'}>
                     {position.changeGBP >= 0 ? '▲' : '▼'}

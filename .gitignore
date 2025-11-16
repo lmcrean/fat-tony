@@ -43,3 +43,5 @@ source_of_truth/*
 
 *.csv
 mockups/
+screenshots/mockups
+screenshots/

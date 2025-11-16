@@ -9,7 +9,7 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from tabulate import tabulate
 
-from .models import Position, AccountSummary
+from .models import Position, AccountSummary, OrderHistory
 from .client import Trading212Client
 from .ticker_mappings import get_display_name
 
@@ -26,9 +26,11 @@ class PortfolioExporter:
         else:
             # New format: dictionary of clients
             self.clients = clients
-        
+
         self.positions: List[Position] = []
         self.account_summaries: Dict[str, AccountSummary] = {}
+        self.buy_history: List[OrderHistory] = []
+        self.sell_history: List[OrderHistory] = []
     
     
     def fetch_data(self):
@@ -359,7 +361,12 @@ class PortfolioExporter:
             actual_currency = self._detect_actual_currency(position.ticker, position.current_price, position.currency)
             price_owned_gbp = self._convert_to_gbp(position.average_price, position.currency, position.ticker)
             current_price_gbp = self._convert_to_gbp(position.current_price, position.currency, position.ticker)
-            
+
+            # Calculate market value and profit/loss in GBP
+            market_value_gbp = current_price_gbp * position.shares
+            cost_basis_gbp = price_owned_gbp * position.shares
+            profit_loss_gbp = market_value_gbp - cost_basis_gbp
+
             csv_data.append([
                 account_type,
                 position.name,
@@ -371,8 +378,8 @@ class PortfolioExporter:
                 self._format_price_raw(price_owned_gbp),
                 self._format_price_raw(position.current_price),
                 self._format_price_raw(current_price_gbp),
-                self._format_currency_csv(position.market_value),
-                self._format_profit_loss_csv(position.profit_loss),
+                self._format_currency_csv(market_value_gbp),
+                self._format_profit_loss_csv(profit_loss_gbp),
                 f"{position.profit_loss_percent.quantize(Decimal('0.01'), rounding=ROUND_HALF_UP):.2f}"
             ])
         
@@ -432,7 +439,206 @@ class PortfolioExporter:
                 ])
         
         return csv_data
-    
+
+    def fetch_order_history(self):
+        """Fetch order history from all accounts and separate into buy/sell lists."""
+        print("\n" + "="*60)
+        print("Fetching order history from all accounts...")
+        print("="*60)
+
+        # Create a dict to map tickers to current positions for performance calculation
+        position_lookup = {p.ticker: p for p in self.positions}
+
+        for account_name, client in self.clients.items():
+            print(f"\n--- Fetching order history for {account_name} ---")
+
+            try:
+                # Fetch all orders (paginate if needed)
+                all_orders = []
+                cursor = 0
+                limit = 50
+
+                while True:
+                    print(f"Fetching orders (cursor={cursor})...")
+                    orders = client.get_order_history(limit=limit, cursor=cursor)
+
+                    if not orders:
+                        break
+
+                    all_orders.extend(orders)
+                    print(f"  Retrieved {len(orders)} orders")
+
+                    # Check if there are more orders to fetch
+                    if len(orders) < limit:
+                        # Last page reached
+                        break
+
+                    cursor += limit
+
+                print(f"Total orders retrieved for {account_name}: {len(all_orders)}")
+
+                # Process each order
+                for order_data in all_orders:
+                    # Skip orders that aren't filled
+                    if order_data.get('status') != 'FILLED':
+                        continue
+
+                    ticker = order_data.get('ticker', '')
+                    filled_quantity = Decimal(str(order_data.get('filledQuantity', 0)))
+                    filled_value = Decimal(str(order_data.get('filledValue', 0)))
+
+                    # Skip if no filled quantity
+                    if filled_quantity == 0:
+                        continue
+
+                    # Calculate average fill price
+                    price = filled_value / abs(filled_quantity) if filled_quantity != 0 else Decimal('0')
+
+                    # Parse creation time
+                    creation_time_str = order_data.get('creationTime', '')
+                    try:
+                        creation_time = datetime.fromisoformat(creation_time_str.replace('Z', '+00:00'))
+                    except:
+                        creation_time = datetime.now()
+
+                    # Get instrument name (from ticker mapping or position lookup)
+                    name = ticker
+                    if ticker in position_lookup:
+                        name = position_lookup[ticker].name
+                    else:
+                        # Try to get from ticker mappings
+                        name = get_display_name(ticker, None)
+
+                    # Determine account type (ISA or Trading)
+                    account_type = "ISA" if "ISA" in account_name else "Trading"
+
+                    # Create OrderHistory object
+                    order = OrderHistory(
+                        order_id=order_data.get('id', 0),
+                        creation_time=creation_time,
+                        ticker=ticker,
+                        name=name,
+                        quantity=abs(filled_quantity),  # Store as positive number
+                        price=price,
+                        total_value=abs(filled_value),  # Store as positive number
+                        order_type=order_data.get('type', 'MARKET'),
+                        status=order_data.get('status', ''),
+                        account_type=account_type
+                    )
+
+                    # Determine if buy or sell based on filled quantity sign
+                    # In Trading 212 API, sells typically have negative filledQuantity
+                    is_sell = filled_quantity < 0 or order_data.get('type') == 'SELL'
+
+                    if is_sell:
+                        self.sell_history.append(order)
+                    else:
+                        # For buy orders, try to calculate current performance
+                        if ticker in position_lookup:
+                            current_position = position_lookup[ticker]
+                            order.current_price = current_position.current_price
+                            order.current_value = order.quantity * current_position.current_price
+
+                        self.buy_history.append(order)
+
+            except Exception as e:
+                print(f"Error fetching order history for {account_name}: {e}")
+                print("Continuing with next account...")
+
+        print(f"\n✓ Total buy orders: {len(self.buy_history)}")
+        print(f"✓ Total sell orders: {len(self.sell_history)}")
+
+    def generate_buy_history_csv(self) -> List[List[str]]:
+        """Generate CSV data for buy history."""
+        csv_data = []
+
+        # Header
+        csv_data.append([
+            "Date", "Ticker", "Name", "Quantity", "Price", "Total Value",
+            "Fees", "Current Price", "Current Value", "Performance", "Performance %"
+        ])
+
+        # Sort by date descending (most recent first)
+        sorted_buys = sorted(self.buy_history, key=lambda x: x.creation_time, reverse=True)
+
+        for order in sorted_buys:
+            # Format date
+            date_str = order.creation_time.strftime('%Y-%m-%d %H:%M:%S')
+
+            # Calculate performance values
+            current_price_str = self._format_price_raw(order.current_price) if order.current_price else "N/A"
+            current_value_str = self._format_currency_csv(order.current_value) if order.current_value else "N/A"
+            performance_str = self._format_profit_loss_csv(order.performance) if order.performance else "N/A"
+            performance_pct_str = self._format_percentage_csv(order.performance_percent) if order.performance_percent else "N/A"
+
+            csv_data.append([
+                date_str,
+                order.ticker,
+                order.name,
+                f"{order.quantity:,.4f}".rstrip('0').rstrip('.'),
+                self._format_price_raw(order.price),
+                self._format_currency_csv(order.total_value),
+                "See note †",  # Fees not available from API
+                current_price_str,
+                current_value_str,
+                performance_str,
+                performance_pct_str
+            ])
+
+        return csv_data
+
+    def generate_sell_history_csv(self) -> List[List[str]]:
+        """Generate CSV data for sell history."""
+        csv_data = []
+
+        # Header
+        csv_data.append([
+            "Date", "Ticker", "Name", "Quantity", "Price", "Total Value", "Fees"
+        ])
+
+        # Sort by date descending (most recent first)
+        sorted_sells = sorted(self.sell_history, key=lambda x: x.creation_time, reverse=True)
+
+        for order in sorted_sells:
+            # Format date
+            date_str = order.creation_time.strftime('%Y-%m-%d %H:%M:%S')
+
+            csv_data.append([
+                date_str,
+                order.ticker,
+                order.name,
+                f"{order.quantity:,.4f}".rstrip('0').rstrip('.'),
+                self._format_price_raw(order.price),
+                self._format_currency_csv(order.total_value),
+                "See note †"  # Fees not available from API
+            ])
+
+        return csv_data
+
+    def save_history_to_csv(self, buy_filename: str = "output/buy_history.csv", sell_filename: str = "output/sell_history.csv"):
+        """Save buy and sell history to separate CSV files."""
+        import os
+
+        # Ensure output directory exists
+        for filename in [buy_filename, sell_filename]:
+            os.makedirs(os.path.dirname(filename), exist_ok=True)
+
+        # Save buy history CSV
+        buy_data = self.generate_buy_history_csv()
+        with open(buy_filename, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerows(buy_data)
+
+        print(f"✓ Buy history exported to {buy_filename}")
+
+        # Save sell history CSV
+        sell_data = self.generate_sell_history_csv()
+        with open(sell_filename, 'w', newline='', encoding='utf-8') as f:
+            writer = csv.writer(f)
+            writer.writerows(sell_data)
+
+        print(f"✓ Sell history exported to {sell_filename}")
+
     def save_to_file(self, filename: str = "portfolio.md"):
         """Save the markdown output to a file."""
         markdown_content = self.generate_markdown()

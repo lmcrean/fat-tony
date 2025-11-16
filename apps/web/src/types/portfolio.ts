@@ -31,3 +31,32 @@ export interface PortfolioData {
   currency: string;
   generatedDate: string;
 }
+
+export interface BuyHistory {
+  date: string;
+  ticker: string;
+  name: string;
+  quantity: number;
+  price: number;
+  totalValue: number;
+  fees: string;
+  currentPrice: string | number;
+  currentValue: string | number;
+  performance: string | number;
+  performancePercent: string | number;
+}
+
+export interface SellHistory {
+  date: string;
+  ticker: string;
+  name: string;
+  quantity: number;
+  price: number;
+  totalValue: number;
+  fees: string;
+}
+
+export interface HistoryData {
+  buyHistory: BuyHistory[];
+  sellHistory: SellHistory[];
+}

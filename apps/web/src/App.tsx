@@ -1,12 +1,19 @@
 import { useState, useEffect } from 'react';
 import PortfolioTable from './components/PortfolioTable';
+import BuyHistoryTable from './components/BuyHistoryTable';
+import SellHistoryTable from './components/SellHistoryTable';
 import AccountSummary from './components/AccountSummary';
 import AccountFilter from './components/AccountFilter';
-import type { PortfolioData } from './types/portfolio';
-import { parsePositionsCSV, parseSummaryCSV } from './utils/csvParser';
+import type { PortfolioData, BuyHistory, SellHistory } from './types/portfolio';
+import { parsePositionsCSV, parseSummaryCSV, parseBuyHistoryCSV, parseSellHistoryCSV } from './utils/csvParser';
+
+type TabType = 'portfolio' | 'buy-history' | 'sell-history';
 
 function App() {
   const [portfolioData, setPortfolioData] = useState<PortfolioData | null>(null);
+  const [buyHistory, setBuyHistory] = useState<BuyHistory[]>([]);
+  const [sellHistory, setSellHistory] = useState<SellHistory[]>([]);
+  const [activeTab, setActiveTab] = useState<TabType>('portfolio');
   const [selectedAccount, setSelectedAccount] = useState('All');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -14,22 +21,37 @@ function App() {
   useEffect(() => {
     async function loadData() {
       try {
-        // Load both CSV files
-        const [positionsResponse, summaryResponse] = await Promise.all([
+        // Load all CSV files
+        const [positionsResponse, summaryResponse, buyHistoryResponse, sellHistoryResponse] = await Promise.all([
           fetch('/output/portfolio_positions_FINAL.csv'),
           fetch('/output/portfolio_summary.csv'),
+          fetch('/output/buy_history.csv'),
+          fetch('/output/sell_history.csv'),
         ]);
 
         if (!positionsResponse.ok || !summaryResponse.ok) {
-          throw new Error('Failed to load CSV files');
+          throw new Error('Failed to load portfolio CSV files');
         }
 
         const positionsText = await positionsResponse.text();
         const summaryText = await summaryResponse.text();
 
-        // Parse the data
+        // Parse portfolio data
         const positions = parsePositionsCSV(positionsText);
         const summaryData = parseSummaryCSV(summaryText);
+
+        // Parse history data (optional - may not exist yet)
+        if (buyHistoryResponse.ok) {
+          const buyHistoryText = await buyHistoryResponse.text();
+          const buyData = parseBuyHistoryCSV(buyHistoryText);
+          setBuyHistory(buyData);
+        }
+
+        if (sellHistoryResponse.ok) {
+          const sellHistoryText = await sellHistoryResponse.text();
+          const sellData = parseSellHistoryCSV(sellHistoryText);
+          setSellHistory(sellData);
+        }
 
         // Combine into PortfolioData
         setPortfolioData({
@@ -91,16 +113,82 @@ function App() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-6 py-8">
-        <AccountFilter
-          selectedAccount={selectedAccount}
-          onAccountChange={setSelectedAccount}
-        />
+        {/* Tab Navigation */}
+        <div className="flex gap-3 mb-6">
+          <button
+            onClick={() => setActiveTab('portfolio')}
+            className={`px-6 py-3 rounded-lg font-medium transition-all ${
+              activeTab === 'portfolio'
+                ? 'bg-blue-500 text-white shadow-lg'
+                : 'bg-portfolio-card text-portfolio-text-dim hover:text-portfolio-text hover:bg-portfolio-card/80 border border-portfolio-border'
+            }`}
+          >
+            Portfolio
+          </button>
+          <button
+            onClick={() => setActiveTab('buy-history')}
+            className={`px-6 py-3 rounded-lg font-medium transition-all ${
+              activeTab === 'buy-history'
+                ? 'bg-blue-500 text-white shadow-lg'
+                : 'bg-portfolio-card text-portfolio-text-dim hover:text-portfolio-text hover:bg-portfolio-card/80 border border-portfolio-border'
+            }`}
+          >
+            Buy History
+            {buyHistory.length > 0 && (
+              <span className="ml-2 text-xs opacity-70">({buyHistory.length})</span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab('sell-history')}
+            className={`px-6 py-3 rounded-lg font-medium transition-all ${
+              activeTab === 'sell-history'
+                ? 'bg-blue-500 text-white shadow-lg'
+                : 'bg-portfolio-card text-portfolio-text-dim hover:text-portfolio-text hover:bg-portfolio-card/80 border border-portfolio-border'
+            }`}
+          >
+            Sell History
+            {sellHistory.length > 0 && (
+              <span className="ml-2 text-xs opacity-70">({sellHistory.length})</span>
+            )}
+          </button>
+        </div>
 
-        <div className="bg-portfolio-card rounded-lg border border-portfolio-border overflow-hidden">
-          <PortfolioTable
-            positions={portfolioData.positions}
-            accountFilter={selectedAccount}
+        {/* Account Filter (only show for portfolio tab) */}
+        {activeTab === 'portfolio' && (
+          <AccountFilter
+            selectedAccount={selectedAccount}
+            onAccountChange={setSelectedAccount}
           />
+        )}
+
+        {/* Content based on active tab */}
+        <div className="bg-portfolio-card rounded-lg border border-portfolio-border overflow-hidden">
+          {activeTab === 'portfolio' && (
+            <PortfolioTable
+              positions={portfolioData.positions}
+              accountFilter={selectedAccount}
+            />
+          )}
+
+          {activeTab === 'buy-history' && (
+            buyHistory.length > 0 ? (
+              <BuyHistoryTable buyHistory={buyHistory} />
+            ) : (
+              <div className="p-12 text-center text-portfolio-text-dim">
+                <p>No buy history available. Run the exporter to fetch transaction history.</p>
+              </div>
+            )
+          )}
+
+          {activeTab === 'sell-history' && (
+            sellHistory.length > 0 ? (
+              <SellHistoryTable sellHistory={sellHistory} />
+            ) : (
+              <div className="p-12 text-center text-portfolio-text-dim">
+                <p>No sell history available. Run the exporter to fetch transaction history.</p>
+              </div>
+            )
+          )}
         </div>
       </div>
 

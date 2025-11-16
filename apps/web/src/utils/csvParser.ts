@@ -1,4 +1,4 @@
-import type { Position, AccountSummary, PortfolioData } from '../types/portfolio';
+import type { Position, AccountSummary, PortfolioData, BuyHistory, SellHistory } from '../types/portfolio';
 
 export function parseNumber(value: string): number {
   // Remove quotes, commas, and + signs
@@ -23,6 +23,7 @@ export function parsePositionsCSV(csvContent: string): Position[] {
     const values = parseCSVLine(line);
     if (values.length < 13) continue;
 
+    // Python exporter now converts all values to GBP, so we can read them directly
     positions.push({
       accountType: values[0],
       name: values[1],
@@ -130,4 +131,62 @@ function parseCSVLine(line: string): string[] {
 
   result.push(current);
   return result;
+}
+
+export function parseBuyHistoryCSV(csvContent: string): BuyHistory[] {
+  const lines = csvContent.trim().split('\n');
+  const buyHistory: BuyHistory[] = [];
+
+  // Skip header (first line)
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    const values = parseCSVLine(line);
+    if (values.length < 11) continue;
+
+    // CSV columns: Date, Ticker, Name, Quantity, Price, Total Value, Fees, Current Price, Current Value, Performance, Performance %
+    buyHistory.push({
+      date: values[0],
+      ticker: values[1],
+      name: values[2],
+      quantity: parseNumber(values[3]),
+      price: parseNumber(values[4]),
+      totalValue: parseNumber(values[5]),
+      fees: values[6], // "See note †" or similar
+      currentPrice: values[7] === 'N/A' ? 'N/A' : parseNumber(values[7]),
+      currentValue: values[8] === 'N/A' ? 'N/A' : parseNumber(values[8]),
+      performance: values[9] === 'N/A' ? 'N/A' : parseNumber(values[9]),
+      performancePercent: values[10] === 'N/A' ? 'N/A' : values[10], // Keep as string with %
+    });
+  }
+
+  return buyHistory;
+}
+
+export function parseSellHistoryCSV(csvContent: string): SellHistory[] {
+  const lines = csvContent.trim().split('\n');
+  const sellHistory: SellHistory[] = [];
+
+  // Skip header (first line)
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+
+    const values = parseCSVLine(line);
+    if (values.length < 7) continue;
+
+    // CSV columns: Date, Ticker, Name, Quantity, Price, Total Value, Fees
+    sellHistory.push({
+      date: values[0],
+      ticker: values[1],
+      name: values[2],
+      quantity: parseNumber(values[3]),
+      price: parseNumber(values[4]),
+      totalValue: parseNumber(values[5]),
+      fees: values[6], // "See note †" or similar
+    });
+  }
+
+  return sellHistory;
 }
